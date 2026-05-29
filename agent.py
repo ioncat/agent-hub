@@ -52,10 +52,10 @@ def _register_tools(registry: ToolRegistry, llm: ClaudeProvider) -> None:
     from tools.cv_generate import cv_generate
     registry.register(cv_generate)
 
+    from tools.cv_cover import cv_cover
+    registry.register(cv_cover)
+
     # Phase 2 tools wired here as EPICs are implemented:
-    #
-    # from tools.cv_cover import cv_cover
-    # registry.register(cv_cover)
     #
     # from tools.cv_get_tracker import cv_get_tracker
     # registry.register(cv_get_tracker)
