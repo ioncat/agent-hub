@@ -38,6 +38,7 @@ Thumbs.db
 # Project-specific
 config/profile.yaml
 vacancies/
+seen_jobs.json    # runtime file from job-board-monitor / emit_vacancy.py
 
 # Chat logs / Q&A notes (local only)
 *Q&A*.md

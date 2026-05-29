@@ -16,12 +16,15 @@ Run:
 
 import asyncio
 import logging
+import logging.handlers
 import signal
 import sys
+from pathlib import Path
 
 from adapters.cv_adapter import CVAdapter
 from adapters.kmp_adapter import KMPAdapter
 from core.deps import AgentDeps
+from core.rss_watcher import RSSWatcher
 from core.settings import ConfigError, load_settings
 from core.llm_client import ClaudeProvider
 from core.tool_registry import ToolRegistry
@@ -29,11 +32,38 @@ from core.router import Router
 from core.telegram import TelegramBot
 from db import database
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%H:%M:%S",
-)
+_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+_LOG_DATE_FMT = "%Y-%m-%d %H:%M:%S"
+_LOG_DIR = Path("logs")
+
+
+def _configure_logging() -> None:
+    """Set up root logger: StreamHandler (terminal) + RotatingFileHandler (file).
+
+    Logs go to both stdout and logs/agent.log simultaneously.
+    File rotates at 5 MB, keeps 5 backups — ~25 MB total max.
+    """
+    _LOG_DIR.mkdir(exist_ok=True)
+    formatter = logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATE_FMT)
+
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setFormatter(formatter)
+
+    file_handler = logging.handlers.RotatingFileHandler(
+        _LOG_DIR / "agent.log",
+        maxBytes=5 * 1024 * 1024,  # 5 MB
+        backupCount=5,
+        encoding="utf-8",
+    )
+    file_handler.setFormatter(formatter)
+
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.addHandler(stream_handler)
+    root.addHandler(file_handler)
+
+
+_configure_logging()
 log = logging.getLogger("agent")
 
 
@@ -121,8 +151,19 @@ async def main() -> None:
         on_message=router.handle,
     )
 
-    # ── 7. Run ────────────────────────────────────────────────────────────────
-    log.info("agent-hub starting — waiting for messages")
+    # ── 7. RSS Watcher ────────────────────────────────────────────────────────
+    watcher = RSSWatcher(
+        seen_jobs_path=settings.seen_jobs_path,
+        deps=deps,
+        telegram_bot=bot,
+        poll_interval=settings.rss_poll_interval,
+    )
+
+    # ── 8. Run ────────────────────────────────────────────────────────────────
+    log.info(
+        "agent-hub starting — seen_jobs=%s poll=%ds",
+        settings.seen_jobs_path, settings.rss_poll_interval,
+    )
 
     loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
@@ -137,11 +178,13 @@ async def main() -> None:
         except NotImplementedError:
             pass  # Windows — signals handled via KeyboardInterrupt
 
+    await watcher.start()
     try:
         await bot.start()
     except KeyboardInterrupt:
         pass
     finally:
+        await watcher.stop()
         await bot.stop()
         log.info("agent-hub stopped")
 

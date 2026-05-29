@@ -40,6 +40,8 @@ class Settings:
     max_tokens: int = 4096
     candidate_name: str = "Candidate"
     callback_cv_path: Path = field(default_factory=lambda: Path("../callback-cv"))
+    seen_jobs_path: Path = field(default_factory=lambda: Path("seen_jobs.json"))
+    rss_poll_interval: int = 60  # seconds between seen_jobs.json polls
 
 
 class ConfigError(Exception):
@@ -88,4 +90,6 @@ def load_settings() -> Settings:
         max_tokens=int(_optional("MAX_TOKENS", "4096")),
         candidate_name=_optional("CANDIDATE_NAME", "Candidate"),
         callback_cv_path=Path(_optional("CALLBACK_CV_PATH", "../callback-cv")),
+        seen_jobs_path=Path(_optional("SEEN_JOBS_PATH", "seen_jobs.json")),
+        rss_poll_interval=int(_optional("RSS_POLL_INTERVAL", "60")),
     )
