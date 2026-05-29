@@ -1,6 +1,6 @@
 # Epic 3: LLM Client
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Done
 **Phase:** 1 — Core Infrastructure
 **Priority:** 🔴 P0 — BLOCKER
 **Blocks:** EPIC-5 (Router), EPIC-7–11 (all CV tools)

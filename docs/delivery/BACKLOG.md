@@ -21,7 +21,7 @@ All Phase 2 work depends on this phase being complete.
 
 ### Epic 3: LLM Client
 **Description**: PydanticAI-based `LLMClient` with `ClaudeProvider` (prompt caching via `cache_control: ephemeral`) and `OllamaProvider` stub.  
-**Status**: 🔵 Planned | **Priority**: 🔴 P0  
+**Status**: 🟢 Done | **Priority**: 🔴 P0  
 [View Epic →](./epics/EPIC-3.md)
 
 ### Epic 4: Telegram Bot
