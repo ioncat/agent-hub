@@ -1,6 +1,6 @@
 # Epic 7: CV Fetch JD Tool
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Done
 **Phase:** 2 — CV Pipeline
 **Priority:** 🔴 P0 — BLOCKER
 **Blocks:** EPIC-8 (cv_analyze), EPIC-9 (cv_generate)

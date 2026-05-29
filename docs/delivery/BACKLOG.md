@@ -48,7 +48,7 @@ Depends on Phase 1 complete.
 
 ### Epic 7: CV Fetch JD Tool
 **Description**: `tools/cv_fetch_jd.py` — fetch vacancy URL via knowledge-mirror-parser (async), save `JD.md`, register vacancy in SQLite.  
-**Status**: 🔵 Planned | **Priority**: 🟡 P2  
+**Status**: 🟢 Done | **Priority**: 🔴 P0  
 [View Epic →](./epics/EPIC-7.md)
 
 ### Epic 8: CV Analysis Tool
