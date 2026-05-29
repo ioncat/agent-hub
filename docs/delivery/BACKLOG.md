@@ -16,7 +16,7 @@ All Phase 2 work depends on this phase being complete.
 
 ### Epic 2: Database Layer
 **Description**: SQLite schema for vacancy metadata and pipeline status. Migration script for existing vacancy folders. Replaces `tracker.json`.  
-**Status**: 🔵 Planned | **Priority**: 🔴 P0  
+**Status**: 🟢 Done | **Priority**: 🔴 P0  
 [View Epic →](./epics/EPIC-2.md)
 
 ### Epic 3: LLM Client
