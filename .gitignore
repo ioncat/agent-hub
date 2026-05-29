@@ -38,3 +38,7 @@ Thumbs.db
 # Project-specific
 config/profile.yaml
 vacancies/
+
+# Chat logs / Q&A notes (local only)
+*Q&A*.md
+Previous chat.md
