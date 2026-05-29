@@ -45,9 +45,15 @@ def _register_tools(registry: ToolRegistry, llm: ClaudeProvider) -> None:
     from tools.cv_fetch_jd import cv_fetch_jd
     registry.register(cv_fetch_jd)
 
+    from tools.cv_analyze import cv_analyze
+    registry.register(cv_analyze)
+
     # Phase 2 tools wired here as EPICs are implemented:
-    # from tools.cv_analyze import cv_analyze
-    # registry.register(cv_analyze)
+    # from tools.cv_generate import cv_generate
+    # registry.register(cv_generate)
+    #
+    # from tools.cv_cover import cv_cover
+    # registry.register(cv_cover)
     #
     # from tools.cv_get_tracker import cv_get_tracker
     # registry.register(cv_get_tracker)
