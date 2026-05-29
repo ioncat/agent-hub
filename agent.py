@@ -19,6 +19,8 @@ import logging
 import signal
 import sys
 
+from adapters.kmp_adapter import KMPAdapter
+from core.deps import AgentDeps
 from core.settings import ConfigError, load_settings
 from core.llm_client import ClaudeProvider
 from core.tool_registry import ToolRegistry
@@ -40,10 +42,10 @@ def _register_tools(registry: ToolRegistry, llm: ClaudeProvider) -> None:
     Tools are imported here to avoid circular imports.
     Each EPIC (7–11) adds its tools in this function.
     """
+    from tools.cv_fetch_jd import cv_fetch_jd
+    registry.register(cv_fetch_jd)
+
     # Phase 2 tools wired here as EPICs are implemented:
-    # from tools.cv_fetch_jd import cv_fetch_jd
-    # registry.register(cv_fetch_jd)
-    #
     # from tools.cv_analyze import cv_analyze
     # registry.register(cv_analyze)
     #
@@ -82,7 +84,16 @@ async def main() -> None:
         max_tokens=settings.max_tokens,
     )
 
-    # ── 4. Tools ──────────────────────────────────────────────────────────────
+    # ── 4. Tools + deps ──────────────────────────────────────────────────────
+    settings.vacancies_path.mkdir(parents=True, exist_ok=True)
+
+    kmp_adapter = KMPAdapter(base_url=settings.kmp_base_url)
+    deps = AgentDeps(
+        kmp_adapter=kmp_adapter,
+        llm=llm,
+        vacancies_path=settings.vacancies_path,
+    )
+
     registry = ToolRegistry()
     _register_tools(registry, llm)
 
@@ -91,6 +102,7 @@ async def main() -> None:
         api_key=settings.anthropic_api_key,
         model=settings.llm_model,
         registry=registry,
+        deps=deps,
     )
 
     # ── 6. Telegram bot ───────────────────────────────────────────────────────

@@ -35,6 +35,7 @@ class Settings:
     profile_md_path: Path = field(default_factory=lambda: Path("../callback-cv/skill/PROFILE.md"))
     db_path: Path = field(default_factory=lambda: Path("db/agent.db"))
     kmp_base_url: str = "http://localhost:8001"
+    vacancies_path: Path = field(default_factory=lambda: Path("vacancies"))
     max_tokens: int = 4096
 
 
@@ -80,5 +81,6 @@ def load_settings() -> Settings:
         )),
         db_path=Path(_optional("DB_PATH", "db/agent.db")),
         kmp_base_url=_optional("KMP_BASE_URL", "http://localhost:8001"),
+        vacancies_path=Path(_optional("VACANCIES_PATH", "vacancies")),
         max_tokens=int(_optional("MAX_TOKENS", "4096")),
     )

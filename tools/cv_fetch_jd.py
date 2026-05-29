@@ -1,0 +1,130 @@
+"""
+tools/cv_fetch_jd.py — fetch and save a job description from a URL.
+
+Pipeline step 0: URL → kmp-service → JD.md on disk + vacancy row in SQLite.
+
+Tool registered in agent.py via ToolRegistry.
+Receives shared dependencies via RunContext[AgentDeps].
+
+Folder layout:
+    vacancies/{site}/YYYY-MM/{slug}/JD.md
+
+Usage (by PydanticAI Agent, not called directly):
+    # user sends URL → router calls this tool automatically
+"""
+
+import logging
+import re
+import sqlite3
+from datetime import datetime
+from pathlib import Path
+from urllib.parse import urlparse
+
+from pydantic_ai import RunContext
+
+from adapters.kmp_adapter import KMPError
+from core.deps import AgentDeps
+from db import database
+
+log = logging.getLogger(__name__)
+
+
+async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
+    """Fetch and parse a job description from a Djinni, DOU, or LinkedIn URL.
+
+    Saves the parsed markdown to disk as JD.md and registers the vacancy
+    in the database. Call this first before running any analysis.
+
+    Args:
+        url: Full URL of the job posting (e.g. https://djinni.co/jobs/123/).
+
+    Returns:
+        Confirmation message with vacancy title and saved path.
+    """
+    url = url.strip()
+    log.info("cv_fetch_jd: url=%r", url)
+
+    # ── Duplicate check ───────────────────────────────────────────────────────
+    existing = await database.get_vacancy_by_url(url)
+    if existing:
+        log.info("cv_fetch_jd: vacancy already in DB id=%d", existing["id"])
+        return (
+            f"ℹ️ Вакансия уже в базе.\n"
+            f"<b>{existing['title'] or 'Без названия'}</b>\n"
+            f"Путь: <code>{existing['markdown_path']}</code>\n"
+            f"Статус: {existing['status']}"
+        )
+
+    # ── Fetch via kmp-service ─────────────────────────────────────────────────
+    try:
+        doc = await ctx.deps.kmp_adapter.fetch_markdown(url)
+    except KMPError as exc:
+        log.error("cv_fetch_jd: KMPError: %s", exc)
+        return f"⚠️ Не удалось получить вакансию:\n{exc}"
+
+    if doc.is_empty:
+        return "⚠️ Страница получена, но не удалось извлечь текст. Попробуй другой URL."
+
+    # ── Build filesystem path ─────────────────────────────────────────────────
+    site = _detect_site(url)
+    month = datetime.now().strftime("%Y-%m")
+    slug = _url_slug(url)
+
+    vacancy_dir = ctx.deps.vacancies_path / site / month / slug
+    vacancy_dir.mkdir(parents=True, exist_ok=True)
+    jd_path = vacancy_dir / "JD.md"
+
+    jd_path.write_text(
+        f"# {doc.title}\n\nSource: {doc.source_url}\n\n---\n\n{doc.markdown}",
+        encoding="utf-8",
+    )
+    log.info("cv_fetch_jd: saved JD.md → %s", jd_path)
+
+    # ── Insert into DB ────────────────────────────────────────────────────────
+    markdown_path = str(jd_path)
+    try:
+        vacancy_id = await database.insert_vacancy(
+            url=url,
+            title=doc.title,
+            site=site,
+            markdown_path=markdown_path,
+        )
+    except Exception as exc:
+        # Concurrent insert race — fetch existing
+        log.warning("cv_fetch_jd: insert failed (%s), fetching existing", exc)
+        existing = await database.get_vacancy_by_url(url)
+        vacancy_id = existing["id"] if existing else None
+
+    log.info("cv_fetch_jd: vacancy_id=%s title=%r", vacancy_id, doc.title)
+
+    return (
+        f"✅ Вакансия сохранена!\n\n"
+        f"<b>{doc.title}</b>\n"
+        f"Сайт: {site} · ID: {vacancy_id}\n"
+        f"Файл: <code>{jd_path}</code>\n\n"
+        f"Запускаем анализ?"
+    )
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _detect_site(url: str) -> str:
+    """Classify URL into known site key."""
+    netloc = urlparse(url).netloc.lower()
+    if "djinni" in netloc:
+        return "djinni"
+    if "dou.ua" in netloc:
+        return "dou"
+    if "linkedin" in netloc:
+        return "linkedin"
+    return "other"
+
+
+def _url_slug(url: str) -> str:
+    """Extract a filesystem-safe slug from the URL path."""
+    path = urlparse(url).path.rstrip("/")
+    last_segment = path.split("/")[-1] if path else "vacancy"
+    # Keep alphanumeric + hyphens, collapse anything else to hyphen, limit length
+    slug = re.sub(r"[^a-z0-9-]", "-", last_segment.lower())
+    slug = re.sub(r"-{2,}", "-", slug).strip("-")
+    return (slug or "vacancy")[:60]

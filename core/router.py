@@ -23,6 +23,7 @@ from pydantic_ai import Agent
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 
+from core.deps import AgentDeps
 from core.tool_registry import ToolRegistry
 
 log = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ class Router:
         api_key:  Anthropic API key. Used to build AnthropicProvider.
         model:    Model identifier, e.g. "claude-opus-4-5".
         registry: ToolRegistry with all registered domain tools.
+        deps:     AgentDeps injected into tools via RunContext on every run.
     """
 
     def __init__(
@@ -55,16 +57,19 @@ class Router:
         api_key: str,
         model: str,
         registry: ToolRegistry,
+        deps: AgentDeps,
     ) -> None:
         provider = AnthropicProvider(api_key=api_key)
         anthropic_model = AnthropicModel(model, provider=provider)
 
-        self._agent: Agent[None, str] = Agent(
+        self._agent: Agent[AgentDeps, str] = Agent(
             model=anthropic_model,
+            deps_type=AgentDeps,
             system_prompt=_SYSTEM_PROMPT,
             tools=registry.as_pydantic_tools(),
             output_type=str,
         )
+        self._deps = deps
         self._registry = registry
         log.info(
             "Router: ready — model=%s tools=%s",
@@ -84,7 +89,7 @@ class Router:
             Exception: Propagated to TelegramBot handler which formats it as ⚠️ error.
         """
         log.info("Router.handle: %r", text[:100])
-        result = await self._agent.run(text)
+        result = await self._agent.run(text, deps=self._deps)
         reply = str(result.output)
         log.info("Router.handle → %d chars", len(reply))
         return reply

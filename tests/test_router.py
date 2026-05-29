@@ -151,12 +151,19 @@ def test_load_settings_invalid_chat_id(monkeypatch):
 
 # ── Router ────────────────────────────────────────────────────────────────────
 
+def _make_mock_deps():
+    """Build a minimal mock AgentDeps (no real adapters needed)."""
+    from core.deps import AgentDeps
+    return MagicMock(spec=AgentDeps)
+
+
 @pytest.mark.asyncio
 async def test_router_handle_returns_string():
     """Router.handle returns agent output as string."""
     from core.router import Router
 
     registry = ToolRegistry()
+    deps = _make_mock_deps()
 
     fake_result = MagicMock()
     fake_result.output = "Отлично, обрабатываю!"
@@ -167,7 +174,7 @@ async def test_router_handle_returns_string():
             mock_agent_instance.run = AsyncMock(return_value=fake_result)
             MockAgent.return_value = mock_agent_instance
 
-            router = Router(api_key="sk-test", model="claude-opus-4-5", registry=registry)
+            router = Router(api_key="sk-test", model="claude-opus-4-5", registry=registry, deps=deps)
             result = await router.handle("https://djinni.co/jobs/123/")
 
     assert result == "Отлично, обрабатываю!"
@@ -179,6 +186,7 @@ async def test_router_passes_tools_to_agent():
     from core.router import Router
 
     registry = ToolRegistry()
+    deps = _make_mock_deps()
 
     @registry.register
     async def cv_fetch_jd(url: str) -> str:
@@ -191,7 +199,7 @@ async def test_router_passes_tools_to_agent():
             mock_agent_instance.run = AsyncMock(return_value=MagicMock(output="ok"))
             MockAgent.return_value = mock_agent_instance
 
-            Router(api_key="sk-test", model="claude-opus-4-5", registry=registry)
+            Router(api_key="sk-test", model="claude-opus-4-5", registry=registry, deps=deps)
 
     call_kwargs = MockAgent.call_args.kwargs
     tools_passed = call_kwargs.get("tools", [])
