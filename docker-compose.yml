@@ -1,0 +1,34 @@
+services:
+
+  kmp-service:
+    build:
+      context: ../knowledge-mirror-parser
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  agent-hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      - KMP_BASE_URL=http://kmp-service:8001
+    depends_on:
+      kmp-service:
+        condition: service_healthy
+    volumes:
+      - vacancies-data:/data/vacancies
+      - ./db:/app/db
+    restart: unless-stopped
+
+volumes:
+  vacancies-data:
