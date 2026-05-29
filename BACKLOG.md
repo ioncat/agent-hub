@@ -10,89 +10,42 @@
 - [ ] Add FastAPI to knowledge-mirror-parser: `POST /parse` → accepts `{url}` → returns `ParsedDocument` JSON
 - [ ] `ParsedDocument`: `{title, markdown, source_url}`
 - [ ] Add to Docker Compose as `kmp-service:8001`
-- [ ] Blocks: cv_fetch_jd.py, KMPAdapter
+- [ ] Blocks: cv_fetch_jd (KMPAdapter call), end-to-end pipeline test
 
-### 🔴 BLOCKER: Database
-- [ ] `db/schema.sql` — SQLite schema (vacancies, status, paths, fit data)
-- [ ] DB init + migration script for existing vacancy folders
-- [ ] Blocks: all tools, web tracker
-
-### 🔴 BLOCKER: LLM client
-- [ ] `core/llm_client.py` — `BaseLLMProvider`, `ClaudeProvider` with prompt caching, `OllamaProvider` stub
-- [ ] `config/llm.yaml`
-- [ ] Prompt caching: PROFILE.md as cached system prompt (`cache_control: ephemeral`)
-- [ ] Blocks: router.py, all analysis tools
-
-### 🟠 Adapters + Contracts (depends: kmp-service HTTP)
-- [ ] `contracts/parsed_document.py` — `ParsedDocument(BaseModel)`
-- [ ] `contracts/cv_result.py` — `AnalysisResult`, `CVResult`
-- [ ] `adapters/kmp_adapter.py` — `KMPAdapter.fetch_markdown(url)` via httpx
-- [ ] `adapters/cv_adapter.py` — `CVAdapter.to_pdf(md_path)` via subprocess
-
-### 🟠 Telegram (depends: nothing)
-- [ ] `core/telegram.py` — aiogram 3.x, long polling, inline keyboards, `callback_query`
-- [ ] Two async tasks in `agent.py`: TelegramPoller + RSSWatcher
-- [ ] asyncio.Queue for WorkerPool
-
-### 🟠 Core routing (depends: LLM client, Telegram)
-- [ ] `core/tool_registry.py`
-- [ ] `core/router.py` — PydanticAI Agent with tool definitions
-- [ ] `agent.py` — entry point, event loop startup
-
-### 🟡 Prompts (depends: nothing, can start now)
-- [ ] `prompts/phase1_analysis.md` — extract from SKILL.md Phase 1, API-clean
-- [ ] `prompts/phase2_fit.md`
-- [ ] `prompts/phase3_cv_draft.md`
-- [ ] `prompts/phase3_5_review.md`
-- [ ] `prompts/phase4_cover.md`
-
-### 🟡 CV Tools (depends: DB, LLM client, adapters, prompts, Telegram)
-- [ ] `tools/cv_fetch_jd.py` — KMPAdapter.fetch_markdown → JD.md → SQLite INSERT
-- [ ] `tools/cv_analyze.py` — Phase 1+2 → JD_analysis.md + SQLite UPDATE
-- [ ] `tools/cv_generate.py` — Phase 3 → Phase 3.5 → approve → CV.md + PDF + SQLite UPDATE
-- [ ] `tools/cv_cover.py` — Phase 4 → Telegram message + Cover.md
-- [ ] `tools/cv_get_tracker.py` — SQLite → Telegram summary
-
-### 🟡 Web tracker (depends: DB)
-- [ ] `web/api.py` — FastAPI: GET /, GET /api/vacancies, GET /api/vacancies/{id}
-- [ ] `web/templates/tracker.html` — HTMX + Jinja2
-
-### 🟢 Docker Compose
-- [ ] `docker-compose.yml` — agent-hub + kmp-service, shared vacancies/ volume
-- [ ] `.env.example`
+### 🟢 Docker Compose + launch scripts
+- [ ] `docker-compose.yml` — finalize: agent-hub + kmp-service, shared vacancies/ volume
+- [ ] `scripts/start_tracker.bat` — one-click web tracker launch (sets env vars, opens browser)
 
 ---
 
 ## P1 — Integration
 
-### 🟠 knowledge-mirror-parser site configs (depends: kmp HTTP endpoint)
+### 🔴 BLOCKER: kmp site configs (depends: kmp HTTP endpoint)
 - [ ] Inspect Djinni job page HTML → `content_selector` + `garbage_selectors`
 - [ ] Inspect DOU job page HTML → same
 - [ ] Add configs to knowledge-mirror-parser
 
-### 🟡 RSS Integration
-- [ ] RSSWatcher: poll `seen_jobs.json` from job-board-monitor
-- [ ] Vacancies watcher: detect manual folder drop into vacancies/
-- [ ] `config/profile.yaml` — service URLs, Telegram chat IDs, paths
-
 ### 🟡 Contract Tests
 - [ ] `tests/test_kmp_adapter.py` — contract test: KMPAdapter interface
 - [ ] `tests/test_cv_adapter.py` — contract test: CVAdapter interface
+- [ ] `tests/test_web_reader.py` — VacancyView + build_vacancy_view unit tests
+
+### 🟡 End-to-end pipeline test
+- [ ] Run full pipeline on a real vacancy URL: fetch → analyze → generate → cover
+- [ ] Verify DB state transitions + file artifacts + Telegram messages
 
 ---
 
 ## P2 — Onboarding
 
-- [ ] Interactive Telegram onboarding: name variants, contacts, profile
-- [ ] Auto-generate PROFILE.md per user
-- [ ] Decouple SKILL.md language rules
 - [ ] **Multi-user onboarding flow** (Telegram-native):
   - User sends `/start` → bot asks: name, target role, RSS feed URLs, uploads CV PDF
   - PDF → Markdown conversion → personalized PROFILE.md generated
   - Follow-up refinement: name variants (EN/UA), what to highlight vs. hide per role type,
-    experience framing rules per vacancy archetype (e.g. "emphasize 0→1 for startups, de-emphasize for enterprise")
+    experience framing rules per vacancy archetype
   - Each user gets isolated profile + vacancies folder + separate DB namespace
   - RSS feeds stored per-user, watcher spawned per-user on login
+  - **Web tracker becomes multi-user:** per-user auth (Telegram login or token), filtered view by user_id
 
 ---
 
@@ -114,8 +67,29 @@
 
 ---
 
-## P5 — Polish
+## P5 — Polish & Docs
 
-- [ ] Public README with architecture narrative
-- [ ] Mermaid architecture diagram
-- [ ] One-command startup
+- [ ] README: Mermaid logical diagram + architecture diagram + state machine diagram
+- [ ] QUICKSTART.md — one-command startup guide
+- [ ] USER_GUIDE.md — Telegram commands + web tracker usage
+- [ ] `scripts/start_tracker.bat` — one-click launch
+- [ ] One-command Docker startup
+
+---
+
+## ✅ Done (P0)
+
+- DB: schema.sql + database.py + init + migration (import_tracker.py, 46 vacancies)
+- LLM client: ClaudeProvider + prompt caching (PROFILE.md as system prompt)
+- Adapters: KMPAdapter (httpx), CVAdapter (subprocess)
+- Contracts: ParsedDocument, AnalysisResult, CVResult
+- Telegram: aiogram 3.x, long polling, callback_query, inline keyboards
+- Router: PydanticAI Agent + tool_registry.py
+- Prompts: phase1–phase4 (all 5 files)
+- CV Tools: cv_fetch_jd, cv_analyze, cv_generate, cv_cover, cv_get_tracker
+- Web tracker: web/api.py + web/templates/tracker.html + web/reader.py
+- RSS Watcher: core/rss_watcher.py + scripts/emit_vacancy.py
+- File logging: RotatingFileHandler (logs/agent.log, 5MB×5)
+- Timing logs: all LLM calls + HTTP fetches
+- DB state machine logs: vacancy status transitions + pipeline run transitions
+- .env.example, .gitignore
