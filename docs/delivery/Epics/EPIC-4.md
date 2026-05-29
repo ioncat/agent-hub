@@ -1,6 +1,6 @@
 # Epic 4: Telegram Bot
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Done
 **Phase:** 1 — Core Infrastructure
 **Priority:** 🔴 P0 — BLOCKER
 **Blocks:** EPIC-5 (Router wiring), all user-facing output

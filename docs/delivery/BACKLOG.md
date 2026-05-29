@@ -25,8 +25,8 @@ All Phase 2 work depends on this phase being complete.
 [View Epic →](./epics/EPIC-3.md)
 
 ### Epic 4: Telegram Bot
-**Description**: Bidirectional Telegram bot using aiogram 3.x — long polling, inline keyboards, `callback_query` handler. Two async tasks: TelegramPoller + RSSWatcher.  
-**Status**: 🔵 Planned | **Priority**: 🟠 P1  
+**Description**: aiogram 3.x long polling, chat_id security filter, text→router dispatch, send helpers, inline keyboards.  
+**Status**: 🟢 Done | **Priority**: 🔴 P0  
 [View Epic →](./epics/EPIC-4.md)
 
 ### Epic 5: Core Agent Routing
