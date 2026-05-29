@@ -19,6 +19,7 @@ import logging
 import signal
 import sys
 
+from adapters.cv_adapter import CVAdapter
 from adapters.kmp_adapter import KMPAdapter
 from core.deps import AgentDeps
 from core.settings import ConfigError, load_settings
@@ -48,9 +49,10 @@ def _register_tools(registry: ToolRegistry, llm: ClaudeProvider) -> None:
     from tools.cv_analyze import cv_analyze
     registry.register(cv_analyze)
 
+    from tools.cv_generate import cv_generate
+    registry.register(cv_generate)
+
     # Phase 2 tools wired here as EPICs are implemented:
-    # from tools.cv_generate import cv_generate
-    # registry.register(cv_generate)
     #
     # from tools.cv_cover import cv_cover
     # registry.register(cv_cover)
@@ -94,10 +96,13 @@ async def main() -> None:
     settings.vacancies_path.mkdir(parents=True, exist_ok=True)
 
     kmp_adapter = KMPAdapter(base_url=settings.kmp_base_url)
+    cv_adapter = CVAdapter(callback_cv_path=settings.callback_cv_path)
     deps = AgentDeps(
         kmp_adapter=kmp_adapter,
         llm=llm,
         vacancies_path=settings.vacancies_path,
+        candidate_name=settings.candidate_name,
+        cv_adapter=cv_adapter,
     )
 
     registry = ToolRegistry()

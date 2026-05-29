@@ -154,7 +154,9 @@ def test_load_settings_invalid_chat_id(monkeypatch):
 def _make_mock_deps():
     """Build a minimal mock AgentDeps (no real adapters needed)."""
     from core.deps import AgentDeps
-    return MagicMock(spec=AgentDeps)
+    deps = MagicMock(spec=AgentDeps)
+    deps.candidate_name = "Test_Candidate"
+    return deps
 
 
 @pytest.mark.asyncio
