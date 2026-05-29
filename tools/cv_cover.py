@@ -18,6 +18,7 @@ Receives shared dependencies via RunContext[AgentDeps].
 
 import logging
 import re
+import time
 from pathlib import Path
 
 from pydantic_ai import RunContext
@@ -98,8 +99,9 @@ async def cv_cover(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
 
     try:
         log.info("cv_cover: Phase 4 start — vacancy_id=%d", vacancy_id)
+        t0 = time.monotonic()
         cover_text = await ctx.deps.llm.complete(phase4_user, system=phase4_prompt)
-        log.info("cv_cover: Phase 4 done — %d chars", len(cover_text))
+        log.info("cv_cover: Phase 4 done — %d chars, elapsed=%.1fs", len(cover_text), time.monotonic() - t0)
     except LLMError as exc:
         await database.update_pipeline_run(run_id, status="error", error_message=str(exc))
         log.error("cv_cover: Phase 4 LLM error: %s", exc)

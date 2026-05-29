@@ -19,6 +19,7 @@ Receives shared dependencies via RunContext[AgentDeps].
 
 import logging
 import re
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -77,8 +78,9 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
 
     try:
         log.info("cv_analyze: Phase 1 start — vacancy_id=%d", vacancy_id)
+        t0 = time.monotonic()
         phase1_output = await ctx.deps.llm.complete(jd_text, system=phase1_prompt)
-        log.info("cv_analyze: Phase 1 done — %d chars", len(phase1_output))
+        log.info("cv_analyze: Phase 1 done — %d chars, elapsed=%.1fs", len(phase1_output), time.monotonic() - t0)
     except LLMError as exc:
         await database.update_pipeline_run(run1_id, status="error", error_message=str(exc))
         log.error("cv_analyze: Phase 1 LLM error: %s", exc)
@@ -98,8 +100,9 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
 
     try:
         log.info("cv_analyze: Phase 2 start — vacancy_id=%d", vacancy_id)
+        t0 = time.monotonic()
         phase2_output = await ctx.deps.llm.complete(phase2_user, system=phase2_prompt)
-        log.info("cv_analyze: Phase 2 done — %d chars", len(phase2_output))
+        log.info("cv_analyze: Phase 2 done — %d chars, elapsed=%.1fs", len(phase2_output), time.monotonic() - t0)
     except LLMError as exc:
         await database.update_pipeline_run(run2_id, status="error", error_message=str(exc))
         log.error("cv_analyze: Phase 2 LLM error: %s", exc)

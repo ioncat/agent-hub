@@ -16,6 +16,7 @@ Usage (by PydanticAI Agent, not called directly):
 import logging
 import re
 import sqlite3
+import time
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -56,10 +57,12 @@ async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
         )
 
     # ── Fetch via kmp-service ─────────────────────────────────────────────────
+    t0 = time.monotonic()
     try:
         doc = await ctx.deps.kmp_adapter.fetch_markdown(url)
+        log.info("cv_fetch_jd: kmp fetch done — elapsed=%.1fs title=%r", time.monotonic() - t0, doc.title)
     except KMPError as exc:
-        log.error("cv_fetch_jd: KMPError: %s", exc)
+        log.error("cv_fetch_jd: KMPError after %.1fs: %s", time.monotonic() - t0, exc)
         return f"⚠️ Не удалось получить вакансию:\n{exc}"
 
     if doc.is_empty:

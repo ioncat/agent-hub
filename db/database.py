@@ -102,6 +102,7 @@ async def get_vacancy_by_id(vacancy_id: int) -> aiosqlite.Row | None:
 
 async def update_vacancy_status(vacancy_id: int, status: str) -> None:
     """Update vacancy status and bump updated_at."""
+    log.info("DB: vacancy #%d status → %s", vacancy_id, status)
     async with get_db() as db:
         await db.execute(
             """
@@ -170,6 +171,11 @@ async def update_pipeline_run(
             started_at_expr = "datetime('now')"
         if status in ("done", "error"):
             finished_at_expr = "datetime('now')"
+
+        if status == "error":
+            log.error("DB: pipeline_run #%d → error: %s", run_id, error_message or "(no message)")
+        elif status == "done":
+            log.info("DB: pipeline_run #%d → done (result=%s)", run_id, result_path)
 
         await db.execute(
             f"""

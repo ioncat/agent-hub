@@ -27,6 +27,7 @@ Receives shared dependencies via RunContext[AgentDeps].
 
 import logging
 import re
+import time
 from pathlib import Path
 
 from pydantic_ai import RunContext
@@ -105,8 +106,9 @@ async def cv_generate(
 
     try:
         log.info("cv_generate: Phase 3 start — vacancy_id=%d", vacancy_id)
+        t0 = time.monotonic()
         phase3_draft = await ctx.deps.llm.complete(phase3_user, system=phase3_prompt)
-        log.info("cv_generate: Phase 3 done — %d chars", len(phase3_draft))
+        log.info("cv_generate: Phase 3 done — %d chars, elapsed=%.1fs", len(phase3_draft), time.monotonic() - t0)
     except LLMError as exc:
         await database.update_pipeline_run(run3_id, status="error", error_message=str(exc))
         log.error("cv_generate: Phase 3 LLM error: %s", exc)
@@ -132,8 +134,9 @@ async def cv_generate(
 
     try:
         log.info("cv_generate: Phase 3.5 start — vacancy_id=%d", vacancy_id)
+        t0 = time.monotonic()
         phase35_output = await ctx.deps.llm.complete(phase35_user, system=phase35_prompt)
-        log.info("cv_generate: Phase 3.5 done — %d chars", len(phase35_output))
+        log.info("cv_generate: Phase 3.5 done — %d chars, elapsed=%.1fs", len(phase35_output), time.monotonic() - t0)
     except LLMError as exc:
         await database.update_pipeline_run(run35_id, status="error", error_message=str(exc))
         log.error("cv_generate: Phase 3.5 LLM error: %s", exc)
