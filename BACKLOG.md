@@ -86,6 +86,13 @@
 - [ ] Interactive Telegram onboarding: name variants, contacts, profile
 - [ ] Auto-generate PROFILE.md per user
 - [ ] Decouple SKILL.md language rules
+- [ ] **Multi-user onboarding flow** (Telegram-native):
+  - User sends `/start` → bot asks: name, target role, RSS feed URLs, uploads CV PDF
+  - PDF → Markdown conversion → personalized PROFILE.md generated
+  - Follow-up refinement: name variants (EN/UA), what to highlight vs. hide per role type,
+    experience framing rules per vacancy archetype (e.g. "emphasize 0→1 for startups, de-emphasize for enterprise")
+  - Each user gets isolated profile + vacancies folder + separate DB namespace
+  - RSS feeds stored per-user, watcher spawned per-user on login
 
 ---
 

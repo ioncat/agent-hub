@@ -39,6 +39,7 @@ Thumbs.db
 config/profile.yaml
 vacancies/
 seen_jobs.json    # runtime file from job-board-monitor / emit_vacancy.py
+db/agent.db       # SQLite runtime DB — not versioned
 
 # Chat logs / Q&A notes (local only)
 *Q&A*.md
