@@ -152,8 +152,10 @@ knowledge-mirror-parser exposes a `POST /parse` endpoint. agent-hub sends a vaca
 
 ## Open Questions
 
-- [ ] Does Djinni require a logged-in session to see full JD? (needs manual check)
-- [ ] Does DOU block automated requests without cookies? (needs manual check)
+- [x] ~~Djinni content_selector~~ → `.job-post__description` ✅ confirmed via HTML inspection
+- [x] ~~DOU content_selector~~ → `.b-typo.vacancy-section` ✅ confirmed via HTML inspection
+- [ ] Does Djinni require login for full JD? (curl without auth returned full text — likely OK)
+- [ ] Does DOU block bots? (curl without cookies returned full text — likely OK)
 - [ ] Where does kmp SQLite DB live in Docker? (mount as volume or ephemeral per-request)
 
 ---
