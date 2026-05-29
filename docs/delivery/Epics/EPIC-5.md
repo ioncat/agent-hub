@@ -1,6 +1,6 @@
 # Epic 5: Core Agent Routing
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Done
 **Phase:** 1 — Core Infrastructure
 **Priority:** 🔴 P0 — BLOCKER (last Phase 1 blocker)
 **Blocks:** Nothing further — Phase 1 complete after this

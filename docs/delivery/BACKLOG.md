@@ -31,7 +31,7 @@ All Phase 2 work depends on this phase being complete.
 
 ### Epic 5: Core Agent Routing
 **Description**: `tool_registry.py`, `router.py` (PydanticAI Agent), `agent.py` entry point. Routes user intent to registered tools.  
-**Status**: 🔵 Planned | **Priority**: 🟠 P1  
+**Status**: 🟢 Done | **Priority**: 🔴 P0  
 [View Epic →](./epics/EPIC-5.md)
 
 ---
