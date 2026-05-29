@@ -1,6 +1,6 @@
 # Epic 1: knowledge-mirror-parser HTTP Endpoint
 
-**Status:** 🔵 Planned
+**Status:** 🟢 Done
 **Phase:** 1 — Core Infrastructure
 **Priority:** 🔴 P0 — BLOCKER
 **Blocks:** EPIC-2 (KMPAdapter), cv_fetch_jd tool, all CV pipeline

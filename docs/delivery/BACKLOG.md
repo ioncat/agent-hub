@@ -11,7 +11,7 @@ All Phase 2 work depends on this phase being complete.
 
 ### Epic 1: knowledge-mirror-parser HTTP Endpoint
 **Description**: Add FastAPI `POST /parse` to kmp — accepts URL, returns `ParsedDocument` JSON. Site configs for Djinni + DOU. Dockerfile + docker-compose entry. Defines the service contract used by agent-hub's KMPAdapter.  
-**Status**: 🔵 Planned | **Priority**: 🔴 P0  
+**Status**: 🟢 Done | **Priority**: 🔴 P0  
 [View Epic →](./epics/EPIC-1.md)
 
 ### Epic 2: Database Layer
