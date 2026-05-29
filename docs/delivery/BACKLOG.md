@@ -43,7 +43,7 @@ Depends on Phase 1 complete.
 
 ### Epic 6: Prompt Files
 **Description**: API-clean prompt files extracted from `callback-cv/skill/SKILL.md` — one file per phase (1 analysis, 2 fit, 3 CV draft, 3.5 self-review, 4 cover). No Claude Code artifacts.  
-**Status**: 🔵 Planned | **Priority**: 🟠 P1  
+**Status**: 🟢 Done | **Priority**: 🔴 P0  
 [View Epic →](./epics/EPIC-6.md)
 
 ### Epic 7: CV Fetch JD Tool

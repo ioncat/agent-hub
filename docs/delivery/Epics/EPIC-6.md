@@ -1,6 +1,6 @@
 # Epic 6: Prompt Files
 
-**Status:** 🟡 In Progress
+**Status:** 🟢 Done
 **Phase:** 2 — CV Pipeline
 **Priority:** 🔴 P0 — BLOCKER
 **Blocks:** EPIC-8 (cv_analyze), EPIC-9 (cv_generate), EPIC-10 (cv_cover)
