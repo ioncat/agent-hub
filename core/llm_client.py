@@ -194,6 +194,7 @@ class ClaudeProvider:
                 max_tokens=self._max_tokens,
                 system=system_parts,
                 messages=[{"role": "user", "content": user}],
+                betas=["prompt-caching-2024-07-31"],
             )
         except anthropic.APIStatusError as exc:
             log.error("Claude API error %d: %s", exc.status_code, exc.message)
