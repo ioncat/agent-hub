@@ -20,6 +20,7 @@ from tools.cv_analyze import _build_analysis_file, _extract_quick_scan, cv_analy
 def _make_llm(side_effect=None, return_value="LLM output") -> AsyncMock:
     """Build mock ClaudeProvider.complete."""
     llm = AsyncMock()
+    llm.last_call_usage = None  # prevent **unpacking AsyncMock in insert_llm_usage
     if side_effect is not None:
         llm.complete = AsyncMock(side_effect=side_effect)
     else:

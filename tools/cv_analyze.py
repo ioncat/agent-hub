@@ -81,6 +81,8 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
         t0 = time.monotonic()
         phase1_output = await ctx.deps.llm.complete(jd_text, system=phase1_prompt)
         log.info("cv_analyze: Phase 1 done — %d chars, elapsed=%.1fs", len(phase1_output), time.monotonic() - t0)
+        if u := ctx.deps.llm.last_call_usage:
+            await database.insert_llm_usage(phase="phase1", vacancy_id=vacancy_id, **u)
     except LLMError as exc:
         await database.update_pipeline_run(run1_id, status="error", error_message=str(exc))
         log.error("cv_analyze: Phase 1 LLM error: %s", exc)
@@ -103,6 +105,8 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
         t0 = time.monotonic()
         phase2_output = await ctx.deps.llm.complete(phase2_user, system=phase2_prompt)
         log.info("cv_analyze: Phase 2 done — %d chars, elapsed=%.1fs", len(phase2_output), time.monotonic() - t0)
+        if u := ctx.deps.llm.last_call_usage:
+            await database.insert_llm_usage(phase="phase2", vacancy_id=vacancy_id, **u)
     except LLMError as exc:
         await database.update_pipeline_run(run2_id, status="error", error_message=str(exc))
         log.error("cv_analyze: Phase 2 LLM error: %s", exc)

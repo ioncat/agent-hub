@@ -64,6 +64,7 @@ def _make_ctx(tmp_path: Path, llm=None, cv_adapter=None) -> MagicMock:
 
 def _make_llm(side_effect=None, return_value="output") -> AsyncMock:
     llm = AsyncMock()
+    llm.last_call_usage = None  # prevent **unpacking AsyncMock in insert_llm_usage
     if side_effect is not None:
         llm.complete = AsyncMock(side_effect=side_effect)
     else:

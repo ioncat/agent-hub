@@ -192,6 +192,34 @@ async def update_pipeline_run(
         await db.commit()
 
 
+async def insert_llm_usage(
+    phase: str,
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cache_write_tokens: int,
+    cache_read_tokens: int,
+    cost_usd: float,
+    vacancy_id: int | None = None,
+) -> int:
+    """Record one LLM API call for cost tracking and unit economics analysis."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            """
+            INSERT INTO llm_usage
+                (vacancy_id, phase, model,
+                 input_tokens, output_tokens,
+                 cache_write_tokens, cache_read_tokens, cost_usd)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (vacancy_id, phase, model,
+             input_tokens, output_tokens,
+             cache_write_tokens, cache_read_tokens, round(cost_usd, 6)),
+        )
+        await db.commit()
+        return cursor.lastrowid  # type: ignore[return-value]
+
+
 async def get_pipeline_runs(vacancy_id: int) -> list[aiosqlite.Row]:
     """Return all pipeline runs for a vacancy, ordered by phase."""
     async with get_db() as db:

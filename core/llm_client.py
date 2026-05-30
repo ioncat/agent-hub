@@ -126,6 +126,7 @@ class ClaudeProvider:
         self._sess_cache_write = 0
         self._sess_cache_read = 0
         self._sess_cost_usd = 0.0
+        self._last_call_usage: dict | None = None
 
     async def _confirm_call(self, user: str, system: str | None) -> bool:
         """In testing mode: print warning and ask for confirmation.
@@ -205,6 +206,14 @@ class ClaudeProvider:
         self._sess_cache_write += cw
         self._sess_cache_read += cr
         self._sess_cost_usd += cost
+        self._last_call_usage = {
+            "model": self._model,
+            "input_tokens": inp,
+            "output_tokens": out,
+            "cache_write_tokens": cw,
+            "cache_read_tokens": cr,
+            "cost_usd": round(cost, 6),
+        }
 
         log.info(
             "LLM call #%d: in=%d out=%d cache_write=%d cache_read=%d cost=$%.4f"
@@ -241,6 +250,11 @@ class ClaudeProvider:
             "cache_read_tokens": self._sess_cache_read,
             "cost_usd": round(self._sess_cost_usd, 6),
         }
+
+    @property
+    def last_call_usage(self) -> dict | None:
+        """Usage dict from the most recent complete() call. None if no calls yet."""
+        return self._last_call_usage
 
     def log_session_summary(self) -> None:
         """Log cumulative session cost — call at agent shutdown."""

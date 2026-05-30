@@ -43,3 +43,24 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
 
 CREATE INDEX IF NOT EXISTS idx_pipeline_vacancy ON pipeline_runs (vacancy_id);
 CREATE INDEX IF NOT EXISTS idx_pipeline_status  ON pipeline_runs (status);
+
+-- ── llm_usage ─────────────────────────────────────────────────────────────────
+-- One row per LLM API call. Enables cost analysis per vacancy, per phase,
+-- per model, and cache efficiency tracking (unit economics).
+
+CREATE TABLE IF NOT EXISTS llm_usage (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    vacancy_id           INTEGER REFERENCES vacancies(id) ON DELETE SET NULL,
+    phase                TEXT    NOT NULL,   -- 'phase1' | 'phase2' | 'phase3' | 'phase3_5' | 'phase4'
+    model                TEXT    NOT NULL,
+    input_tokens         INTEGER NOT NULL DEFAULT 0,
+    output_tokens        INTEGER NOT NULL DEFAULT 0,
+    cache_write_tokens   INTEGER NOT NULL DEFAULT 0,
+    cache_read_tokens    INTEGER NOT NULL DEFAULT 0,
+    cost_usd             REAL    NOT NULL DEFAULT 0.0,
+    created_at           TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_llm_usage_vacancy ON llm_usage (vacancy_id);
+CREATE INDEX IF NOT EXISTS idx_llm_usage_phase   ON llm_usage (phase);
+CREATE INDEX IF NOT EXISTS idx_llm_usage_date    ON llm_usage (created_at);
