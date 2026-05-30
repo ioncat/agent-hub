@@ -195,34 +195,45 @@ async def cv_generate(
 def _split_review_and_cv(phase35_output: str) -> tuple[str, str]:
     """Split Phase 3.5 output into (review_block, final_cv).
 
-    The CV starts with Name / Headline / Contacts block, followed by 'SUMMARY'
-    on its own line (required by Phase 3 template). We detect 'SUMMARY' as the
-    anchor and walk back one paragraph break to include the name header.
+    Tries three strategies in order:
+
+    1. Explicit separator  ---CV---  (preferred, added to prompt).
+    2. Markdown heading   # UPDATED CV DRAFT  (LLM fallback).
+    3. Bare SUMMARY line (original format).
 
     Returns:
         (review_block, final_cv) — either may be empty string on parse failure.
     """
-    match = re.search(r"(?m)^SUMMARY$", phase35_output)
-    if not match:
-        log.warning("cv_generate: SUMMARY not found in Phase 3.5 output")
-        return "", phase35_output.strip()
+    # ── Strategy 1: explicit ---CV--- separator (prompt-enforced) ────────────
+    m = re.search(r"(?m)^---CV---\s*$", phase35_output)
+    if m:
+        review = phase35_output[: m.start()].strip()
+        cv = phase35_output[m.end():].strip()
+        return review, cv
 
-    before_summary = phase35_output[: match.start()]
+    # ── Strategy 2: "# UPDATED CV DRAFT" heading ─────────────────────────────
+    m = re.search(r"(?m)^#{1,3}\s*UPDATED CV", phase35_output, re.IGNORECASE)
+    if m:
+        review = phase35_output[: m.start()].strip()
+        after_heading = phase35_output[m.end():]
+        # Strip the optional --- separator line after the heading
+        cv = re.sub(r"^\s*-{3,}\s*\n", "", after_heading).strip()
+        return review, cv
 
-    # Strip trailing newlines: before_summary ends with \n\n (the blank line before SUMMARY).
-    # rfind on the raw string would hit that trailing \n\n and return an empty name_block.
-    # Stripping first makes rfind find the \n\n between the review block and the name block.
-    before_stripped = before_summary.rstrip("\n")
-    last_para_break = before_stripped.rfind("\n\n")
+    # ── Strategy 3: bare SUMMARY anchor (original) ───────────────────────────
+    m = re.search(r"(?m)^SUMMARY$", phase35_output)
+    if m:
+        before_summary = phase35_output[: m.start()]
+        before_stripped = before_summary.rstrip("\n")
+        last_para_break = before_stripped.rfind("\n\n")
+        if last_para_break != -1:
+            review = before_stripped[:last_para_break].strip()
+            name_block = before_stripped[last_para_break + 2:].strip()
+            cv = name_block + "\n\n" + phase35_output[m.start():]
+        else:
+            review = ""
+            cv = phase35_output.strip()
+        return review, cv.strip()
 
-    if last_para_break != -1:
-        review = before_stripped[:last_para_break].strip()
-        # name/headline/contacts block: between last_para_break and SUMMARY
-        name_block = before_stripped[last_para_break + 2 :].strip()
-        cv = name_block + "\n\n" + phase35_output[match.start():]
-    else:
-        # No paragraph break — treat everything before SUMMARY as the name block
-        review = ""
-        cv = phase35_output.strip()
-
-    return review, cv.strip()
+    log.warning("cv_generate: no split anchor found in Phase 3.5 output — using full output as CV")
+    return "", phase35_output.strip()

@@ -56,6 +56,14 @@ CV SELF-REVIEW
 
 Then output the updated CV draft with all identified changes already applied.
 
+Separate the review from the CV with this exact line on its own:
+
+```
+---CV---
+```
+
+Do not use any other separator. The parser relies on `---CV---` to extract the CV.
+
 ---
 
 ## Rules

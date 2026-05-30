@@ -139,7 +139,45 @@ async def run_e2e(url: str, phases: list[str]) -> None:
         result = await cv_analyze(ctx, vacancy_id)  # type: ignore[arg-type]
         print(f"\n--- cv_analyze result ---\n{result}\n")
 
-    print("✅  e2e test complete")
+    # ── Phase: generate ───────────────────────────────────────────────────────
+    if "generate" in phases:
+        if vacancy_id is None:
+            from db.database import get_vacancy_by_url
+            row = await get_vacancy_by_url(url)
+            if not row:
+                print("❌  Vacancy not in DB — run 'fetch' phase first")
+                sys.exit(1)
+            vacancy_id = row["id"]
+
+        print(f"📝  Phase: cv_generate (vacancy #{vacancy_id})")
+        from tools.cv_generate import cv_generate
+        result = await cv_generate(ctx, vacancy_id)  # type: ignore[arg-type]
+        print(f"\n--- cv_generate result ---\n{result}\n")
+
+    # ── Phase: cover ──────────────────────────────────────────────────────────
+    if "cover" in phases:
+        if vacancy_id is None:
+            from db.database import get_vacancy_by_url
+            row = await get_vacancy_by_url(url)
+            if not row:
+                print("❌  Vacancy not in DB — run 'fetch' phase first")
+                sys.exit(1)
+            vacancy_id = row["id"]
+
+        print(f"✉️   Phase: cv_cover (vacancy #{vacancy_id})")
+        from tools.cv_cover import cv_cover
+        result = await cv_cover(ctx, vacancy_id)  # type: ignore[arg-type]
+        print(f"\n--- cv_cover result ---\n{result}\n")
+
+    # ── Session cost summary ──────────────────────────────────────────────────
+    s = llm.session_summary
+    if s["calls"] > 0:
+        print(f"\n💰  Session cost: {s['calls']} calls | "
+              f"in={s['input_tokens']} out={s['output_tokens']} "
+              f"cache_write={s['cache_write_tokens']} cache_read={s['cache_read_tokens']} "
+              f"| total=${s['cost_usd']:.4f}")
+
+    print("\n✅  e2e test complete")
 
 
 def main() -> None:
