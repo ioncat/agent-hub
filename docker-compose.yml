@@ -1,5 +1,6 @@
 services:
 
+  # ── knowledge-mirror-parser — URL → Markdown ───────────────────────────────
   kmp-service:
     build:
       context: ../knowledge-mirror-parser
@@ -14,6 +15,7 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  # ── agent-hub — Telegram bot + RSS watcher ─────────────────────────────────
   agent-hub:
     build:
       context: .
@@ -21,14 +23,37 @@ services:
     env_file:
       - .env
     environment:
-      - KMP_BASE_URL=http://kmp-service:8001
+      KMP_BASE_URL: http://kmp-service:8001
+      DB_PATH: /app/db/agent.db
+      VACANCIES_PATH: /app/vacancies
+      CALLBACK_CV_PATH: /app/callback-cv
+    volumes:
+      - ./db:/app/db                        # SQLite DB — persisted on host
+      - ./vacancies:/app/vacancies          # vacancy folders — persisted on host
+      - ../callback-cv:/app/callback-cv:ro  # PROFILE.md + cv_to_pdf.py (read-only)
     depends_on:
       kmp-service:
         condition: service_healthy
-    volumes:
-      - vacancies-data:/data/vacancies
-      - ./db:/app/db
     restart: unless-stopped
 
-volumes:
-  vacancies-data:
+  # ── web-tracker — read-only FastAPI dashboard ──────────────────────────────
+  web-tracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: uvicorn web.api:app --host 0.0.0.0 --port 8080
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      DB_PATH: /app/db/agent.db
+      VACANCIES_PATH: /app/vacancies
+      CALLBACK_CV_PATH: /app/callback-cv
+    volumes:
+      - ./db:/app/db:ro                     # read-only — tracker never writes
+      - ./vacancies:/app/vacancies:ro
+      - ../callback-cv:/app/callback-cv:ro
+    depends_on:
+      - agent-hub
+    restart: unless-stopped
