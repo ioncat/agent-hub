@@ -39,9 +39,18 @@ _PRICING: dict[str, dict[str, float]] = {
 _PRICING_FALLBACK = {"input": 15.0, "output": 75.0, "cache_write": 18.75, "cache_read": 1.5}
 
 
+def _normalize_model(model: str) -> str:
+    """Strip date suffix from model name for pricing lookup.
+
+    e.g. 'claude-opus-4-5-20251101' → 'claude-opus-4-5'
+    """
+    import re
+    return re.sub(r"-\d{8}$", "", model)
+
+
 def _calc_cost(model: str, inp: int, out: int, cw: int, cr: int) -> float:
     """Calculate USD cost for a single API call."""
-    p = _PRICING.get(model, _PRICING_FALLBACK)
+    p = _PRICING.get(_normalize_model(model), _PRICING_FALLBACK)
     return (
         inp * p["input"]
         + out * p["output"]
@@ -196,9 +205,19 @@ class ClaudeProvider:
         u = response.usage
         inp = u.input_tokens
         out = u.output_tokens
-        cw  = getattr(u, "cache_creation_input_tokens", 0) or 0
-        cr  = getattr(u, "cache_read_input_tokens", 0) or 0
-        cost = _calc_cost(self._model, inp, out, cw, cr)
+
+        # cache_creation: SDK ≥0.40 returns CacheCreation object with per-TTL fields;
+        # older SDK returns flat cache_creation_input_tokens int.
+        cc = getattr(u, "cache_creation", None)
+        if cc is not None:
+            cw = (getattr(cc, "ephemeral_5m_input_tokens", 0) or 0) + \
+                 (getattr(cc, "ephemeral_1h_input_tokens", 0) or 0)
+        else:
+            cw = getattr(u, "cache_creation_input_tokens", 0) or 0
+        cr = getattr(u, "cache_read_input_tokens", 0) or 0
+
+        actual_model = str(getattr(response, "model", None) or self._model)
+        cost = _calc_cost(actual_model, inp, out, cw, cr)
 
         self._sess_calls += 1
         self._sess_input += inp
@@ -216,9 +235,9 @@ class ClaudeProvider:
         }
 
         log.info(
-            "LLM call #%d: in=%d out=%d cache_write=%d cache_read=%d cost=$%.4f"
+            "LLM call #%d [%s]: in=%d out=%d cache_write=%d cache_read=%d cost=$%.4f"
             " | session total: calls=%d cost=$%.4f",
-            self._sess_calls, inp, out, cw, cr, cost,
+            self._sess_calls, actual_model, inp, out, cw, cr, cost,
             self._sess_calls, self._sess_cost_usd,
         )
 
