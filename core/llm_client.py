@@ -27,6 +27,29 @@ import anthropic
 
 log = logging.getLogger(__name__)
 
+# ── Token pricing (USD per 1M tokens) ────────────────────────────────────────
+# Update when Anthropic changes rates or when switching models.
+_PRICING: dict[str, dict[str, float]] = {
+    "claude-opus-4-5":   {"input": 15.0,  "output": 75.0,  "cache_write": 18.75, "cache_read": 1.5},
+    "claude-opus-4":     {"input": 15.0,  "output": 75.0,  "cache_write": 18.75, "cache_read": 1.5},
+    "claude-sonnet-4-5": {"input": 3.0,   "output": 15.0,  "cache_write": 3.75,  "cache_read": 0.3},
+    "claude-sonnet-4":   {"input": 3.0,   "output": 15.0,  "cache_write": 3.75,  "cache_read": 0.3},
+    "claude-haiku-3-5":  {"input": 0.8,   "output": 4.0,   "cache_write": 1.0,   "cache_read": 0.08},
+}
+_PRICING_FALLBACK = {"input": 15.0, "output": 75.0, "cache_write": 18.75, "cache_read": 1.5}
+
+
+def _calc_cost(model: str, inp: int, out: int, cw: int, cr: int) -> float:
+    """Calculate USD cost for a single API call."""
+    p = _PRICING.get(model, _PRICING_FALLBACK)
+    return (
+        inp * p["input"]
+        + out * p["output"]
+        + cw * p["cache_write"]
+        + cr * p["cache_read"]
+    ) / 1_000_000
+
+
 # ── Exceptions ────────────────────────────────────────────────────────────────
 
 
@@ -96,6 +119,13 @@ class ClaudeProvider:
         self._profile_md = profile_md
         self._max_tokens = max_tokens
         self._testing_mode = testing_mode
+        # ── Session token counters (reset on each ClaudeProvider instance) ───
+        self._sess_calls = 0
+        self._sess_input = 0
+        self._sess_output = 0
+        self._sess_cache_write = 0
+        self._sess_cache_read = 0
+        self._sess_cost_usd = 0.0
 
     async def _confirm_call(self, user: str, system: str | None) -> bool:
         """In testing mode: print warning and ask for confirmation.
@@ -161,6 +191,28 @@ class ClaudeProvider:
             log.error("Claude connection error: %s", exc)
             raise LLMUnavailableError(f"Claude unreachable: {exc}") from exc
 
+        # ── Token accounting ──────────────────────────────────────────────────
+        u = response.usage
+        inp = u.input_tokens
+        out = u.output_tokens
+        cw  = getattr(u, "cache_creation_input_tokens", 0) or 0
+        cr  = getattr(u, "cache_read_input_tokens", 0) or 0
+        cost = _calc_cost(self._model, inp, out, cw, cr)
+
+        self._sess_calls += 1
+        self._sess_input += inp
+        self._sess_output += out
+        self._sess_cache_write += cw
+        self._sess_cache_read += cr
+        self._sess_cost_usd += cost
+
+        log.info(
+            "LLM call #%d: in=%d out=%d cache_write=%d cache_read=%d cost=$%.4f"
+            " | session total: calls=%d cost=$%.4f",
+            self._sess_calls, inp, out, cw, cr, cost,
+            self._sess_calls, self._sess_cost_usd,
+        )
+
         # Extract text from first content block
         if not response.content or response.content[0].type != "text":
             raise LLMError("Claude returned no text content")
@@ -177,6 +229,28 @@ class ClaudeProvider:
     def raw_client(self) -> anthropic.AsyncAnthropic:
         """Expose underlying client for PydanticAI router (EPIC-5)."""
         return self._client
+
+    @property
+    def session_summary(self) -> dict:
+        """Cumulative token usage and cost since this provider was created."""
+        return {
+            "calls": self._sess_calls,
+            "input_tokens": self._sess_input,
+            "output_tokens": self._sess_output,
+            "cache_write_tokens": self._sess_cache_write,
+            "cache_read_tokens": self._sess_cache_read,
+            "cost_usd": round(self._sess_cost_usd, 6),
+        }
+
+    def log_session_summary(self) -> None:
+        """Log cumulative session cost — call at agent shutdown."""
+        s = self.session_summary
+        log.info(
+            "LLM session summary: calls=%d in=%d out=%d"
+            " cache_write=%d cache_read=%d total_cost=$%.4f",
+            s["calls"], s["input_tokens"], s["output_tokens"],
+            s["cache_write_tokens"], s["cache_read_tokens"], s["cost_usd"],
+        )
 
 
 # ── OllamaProvider (stub) ─────────────────────────────────────────────────────

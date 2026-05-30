@@ -189,6 +189,7 @@ async def main() -> None:
     finally:
         await watcher.stop()
         await bot.stop()
+        llm.log_session_summary()
         log.info("agent-hub stopped")
 
 
