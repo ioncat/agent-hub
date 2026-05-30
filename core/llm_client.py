@@ -18,7 +18,9 @@ Usage:
     text = await llm.complete(user="Analyse this JD:", system=phase1_prompt)
 """
 
+import asyncio
 import logging
+import sys
 from typing import Protocol, runtime_checkable
 
 import anthropic
@@ -87,14 +89,45 @@ class ClaudeProvider:
         model: str,
         profile_md: str,
         max_tokens: int = 4096,
+        testing_mode: bool = False,
     ) -> None:
         self._client = anthropic.AsyncAnthropic(api_key=api_key)
         self._model = model
         self._profile_md = profile_md
         self._max_tokens = max_tokens
+        self._testing_mode = testing_mode
+
+    async def _confirm_call(self, user: str, system: str | None) -> bool:
+        """In testing mode: print warning and ask for confirmation.
+
+        Returns True if call should proceed, False to skip.
+        Runs input() in executor so it doesn't block the event loop.
+        """
+        if not self._testing_mode:
+            return True
+
+        preview = user[:200].replace("\n", " ")
+        sys_preview = (system or "")[:100].replace("\n", " ")
+        print(
+            f"\n⚠️  [TESTING MODE] About to call Claude API ({self._model})\n"
+            f"   system: {sys_preview!r}…\n"
+            f"   user:   {preview!r}…\n"
+            f"   user_len={len(user)} chars",
+            flush=True,
+        )
+        answer = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: input("   Proceed? [y/N]: ").strip().lower()
+        )
+        if answer != "y":
+            log.info("ClaudeProvider: call skipped by user in testing mode")
+            return False
+        return True
 
     async def complete(self, user: str, *, system: str | None = None) -> str:
         """Call Claude with PROFILE.md cached + optional task system prompt."""
+        if not await self._confirm_call(user, system):
+            raise LLMError("LLM call cancelled by user (testing mode)")
+
         system_parts: list[dict] = [
             {
                 "type": "text",

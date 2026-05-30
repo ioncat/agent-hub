@@ -118,7 +118,10 @@ async def main() -> None:
         model=settings.llm_model,
         profile_md=profile_md,
         max_tokens=settings.max_tokens,
+        testing_mode=(settings.agent_mode == "testing"),
     )
+    if settings.agent_mode == "testing":
+        log.warning("AGENT_MODE=testing — Claude API calls require confirmation before each request")
 
     # ── 4. Tools + deps ──────────────────────────────────────────────────────
     settings.vacancies_path.mkdir(parents=True, exist_ok=True)
