@@ -21,6 +21,7 @@ Usage:
 import asyncio
 import logging
 import sys
+import time
 from typing import Protocol, runtime_checkable
 
 import anthropic
@@ -35,6 +36,7 @@ _PRICING: dict[str, dict[str, float]] = {
     "claude-opus-4-5":   {"input": 5.0,  "output": 25.0, "cache_write": 6.25, "cache_read": 0.50},
     "claude-opus-4":     {"input": 5.0,  "output": 25.0, "cache_write": 6.25, "cache_read": 0.50},
     # Sonnet 4 family — $3/$15 input/output
+    "claude-sonnet-4-6": {"input": 3.0,  "output": 15.0, "cache_write": 3.75, "cache_read": 0.30},
     "claude-sonnet-4-5": {"input": 3.0,  "output": 15.0, "cache_write": 3.75, "cache_read": 0.30},
     "claude-sonnet-4":   {"input": 3.0,  "output": 15.0, "cache_write": 3.75, "cache_read": 0.30},
     # Haiku 4.5 — $1/$5 input/output
@@ -168,8 +170,22 @@ class ClaudeProvider:
             return False
         return True
 
-    async def complete(self, user: str, *, system: str | None = None) -> str:
-        """Call Claude with PROFILE.md cached + optional task system prompt."""
+    async def complete(
+        self,
+        user: str,
+        *,
+        system: str | None = None,
+        budget_tokens: int | None = None,
+    ) -> str:
+        """Call Claude with PROFILE.md cached + optional task system prompt.
+
+        Args:
+            user:          User-turn message.
+            system:        Task-level system prompt (not cached).
+            budget_tokens: Enable Extended Thinking with this token budget.
+                           When set, max_tokens is automatically raised to
+                           budget_tokens + 4096 (API requirement: max_tokens > budget_tokens).
+        """
         if not await self._confirm_call(user, system):
             raise LLMError("LLM call cancelled by user (testing mode)")
 
@@ -183,18 +199,31 @@ class ClaudeProvider:
         if system:
             system_parts.append({"type": "text", "text": system})
 
+        # Extended Thinking: max_tokens must exceed budget_tokens (API requirement)
+        max_tok = self._max_tokens
+        extra: dict = {}
+        if budget_tokens:
+            max_tok = max(max_tok, budget_tokens + 4096)
+            extra["thinking"] = {"type": "enabled", "budget_tokens": budget_tokens}
+
+        # Per-component token estimates (len // 4 ≈ ±10%)
+        profile_tokens_est = len(self._profile_md) // 4
+        prompt_tokens_est  = len(system) // 4 if system else 0
+        user_tokens_est    = len(user) // 4
+
         log.debug(
-            "ClaudeProvider.complete model=%s system_blocks=%d user_len=%d",
-            self._model, len(system_parts), len(user),
+            "ClaudeProvider.complete model=%s system_blocks=%d user_len=%d thinking=%s",
+            self._model, len(system_parts), len(user), bool(budget_tokens),
         )
 
+        t0 = time.monotonic()
         try:
             response = await self._client.messages.create(
                 model=self._model,
-                max_tokens=self._max_tokens,
+                max_tokens=max_tok,
                 system=system_parts,
                 messages=[{"role": "user", "content": user}],
-                betas=["prompt-caching-2024-07-31"],
+                **extra,
             )
         except anthropic.APIStatusError as exc:
             log.error("Claude API error %d: %s", exc.status_code, exc.message)
@@ -222,6 +251,15 @@ class ClaudeProvider:
             cw = getattr(u, "cache_creation_input_tokens", 0) or 0
         cr = getattr(u, "cache_read_input_tokens", 0) or 0
 
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+
+        # Thinking tokens estimate: sum thinking block text lengths // 4
+        thinking_tokens_est = sum(
+            len(getattr(block, "thinking", "") or "") // 4
+            for block in response.content
+            if block.type == "thinking"
+        )
+
         actual_model = str(getattr(response, "model", None) or self._model)
         cost = _calc_cost(actual_model, inp, out, cw, cr)
 
@@ -233,10 +271,16 @@ class ClaudeProvider:
         self._sess_cost_usd += cost
         self._last_call_usage = {
             "model": self._model,
+            "profile_tokens": profile_tokens_est,
+            "prompt_tokens": prompt_tokens_est,
+            "user_tokens": user_tokens_est,
             "input_tokens": inp,
             "output_tokens": out,
             "cache_write_tokens": cw,
             "cache_read_tokens": cr,
+            "budget_tokens": budget_tokens or 0,
+            "thinking_tokens": thinking_tokens_est,
+            "elapsed_ms": elapsed_ms,
             "cost_usd": round(cost, 6),
         }
 
@@ -247,11 +291,13 @@ class ClaudeProvider:
             self._sess_calls, self._sess_cost_usd,
         )
 
-        # Extract text from first content block
-        if not response.content or response.content[0].type != "text":
+        # Extract text — skip thinking blocks (present when budget_tokens is set)
+        text = next(
+            (block.text for block in response.content if block.type == "text"),
+            None,
+        )
+        if text is None:
             raise LLMError("Claude returned no text content")
-
-        text = response.content[0].text
         log.debug("ClaudeProvider.complete → %d chars", len(text))
         return text
 

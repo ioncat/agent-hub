@@ -47,6 +47,13 @@ async def init_db() -> None:
         # Migrations: add columns introduced after initial schema
         for migration in [
             "ALTER TABLE vacancies ADD COLUMN warnings TEXT NOT NULL DEFAULT ''",
+            # llm_usage granular breakdown (added after initial schema)
+            "ALTER TABLE llm_usage ADD COLUMN profile_tokens  INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE llm_usage ADD COLUMN prompt_tokens   INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE llm_usage ADD COLUMN user_tokens     INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE llm_usage ADD COLUMN budget_tokens   INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE llm_usage ADD COLUMN thinking_tokens INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE llm_usage ADD COLUMN elapsed_ms      INTEGER NOT NULL DEFAULT 0",
         ]:
             try:
                 await db.execute(migration)
@@ -220,20 +227,36 @@ async def insert_llm_usage(
     cache_read_tokens: int,
     cost_usd: float,
     vacancy_id: int | None = None,
+    profile_tokens: int = 0,
+    prompt_tokens: int = 0,
+    user_tokens: int = 0,
+    budget_tokens: int = 0,
+    thinking_tokens: int = 0,
+    elapsed_ms: int = 0,
 ) -> int:
-    """Record one LLM API call for cost tracking and unit economics analysis."""
+    """Record one LLM API call for cost tracking and unit economics analysis.
+
+    Input breakdown (profile/prompt/user) is estimated from text length (len//4, ±10%).
+    API-reported totals (input/output/cache) are exact from the response.
+    """
     async with get_db() as db:
         cursor = await db.execute(
             """
             INSERT INTO llm_usage
                 (vacancy_id, phase, model,
+                 profile_tokens, prompt_tokens, user_tokens,
                  input_tokens, output_tokens,
-                 cache_write_tokens, cache_read_tokens, cost_usd)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 cache_write_tokens, cache_read_tokens,
+                 budget_tokens, thinking_tokens,
+                 elapsed_ms, cost_usd)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (vacancy_id, phase, model,
+             profile_tokens, prompt_tokens, user_tokens,
              input_tokens, output_tokens,
-             cache_write_tokens, cache_read_tokens, round(cost_usd, 6)),
+             cache_write_tokens, cache_read_tokens,
+             budget_tokens, thinking_tokens,
+             elapsed_ms, round(cost_usd, 6)),
         )
         await db.commit()
         return cursor.lastrowid  # type: ignore[return-value]

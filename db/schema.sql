@@ -55,10 +55,21 @@ CREATE TABLE IF NOT EXISTS llm_usage (
     vacancy_id           INTEGER REFERENCES vacancies(id) ON DELETE SET NULL,
     phase                TEXT    NOT NULL,   -- 'phase1' | 'phase2' | 'phase3' | 'phase3_5' | 'phase4'
     model                TEXT    NOT NULL,
-    input_tokens         INTEGER NOT NULL DEFAULT 0,
-    output_tokens        INTEGER NOT NULL DEFAULT 0,
+    -- Input breakdown (estimated from len//4 — approx ±10%)
+    profile_tokens       INTEGER NOT NULL DEFAULT 0,   -- PROFILE.md system block
+    prompt_tokens        INTEGER NOT NULL DEFAULT 0,   -- phase prompt (phase1_analysis.md etc)
+    user_tokens          INTEGER NOT NULL DEFAULT 0,   -- user message: JD / JD+analysis / etc
+    -- API-reported totals (exact)
+    input_tokens         INTEGER NOT NULL DEFAULT 0,   -- total charged input (excl cache reads)
+    output_tokens        INTEGER NOT NULL DEFAULT 0,   -- total output incl thinking tokens
     cache_write_tokens   INTEGER NOT NULL DEFAULT 0,
     cache_read_tokens    INTEGER NOT NULL DEFAULT 0,
+    -- Extended Thinking
+    budget_tokens        INTEGER NOT NULL DEFAULT 0,   -- thinking budget requested
+    thinking_tokens      INTEGER NOT NULL DEFAULT 0,   -- thinking tokens used (estimated)
+    -- Timing
+    elapsed_ms           INTEGER NOT NULL DEFAULT 0,   -- wall-clock API call duration
+    -- Cost
     cost_usd             REAL    NOT NULL DEFAULT 0.0,
     created_at           TEXT    NOT NULL DEFAULT (datetime('now'))
 );

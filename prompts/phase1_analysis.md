@@ -3,8 +3,6 @@
 You are analyzing a job description (JD) to reconstruct what the company is actually trying to solve with this hire.
 The candidate's profile is already in your system context (PROFILE.md).
 
-**Output language: Russian — always, regardless of JD language.**
-
 ---
 
 ## Input
@@ -13,9 +11,12 @@ User will provide the full text of the job description.
 
 ---
 
-## Output Format
+**Output rules:**
+- Language: Russian — always, regardless of JD language
+- Tone: analytical and objective — state conclusions directly, avoid speculation and emotional language
+- All six sections required. Do not skip. Do not add extra sections.
 
-Produce all six sections below. Do not skip any. Do not add sections not listed here.
+## Output Format
 
 ---
 
