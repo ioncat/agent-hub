@@ -50,8 +50,9 @@ async def tracker_page(request: Request, status: str | None = None, limit: int =
     rows = await database.list_vacancies(status=status, limit=limit)
     vacancies = [build_vacancy_view(row, _CANDIDATE_NAME) for row in rows]
     return _TEMPLATES.TemplateResponse(
-        "tracker.html",
-        {"request": request, "vacancies": vacancies, "total": len(vacancies)},
+        request=request,
+        name="tracker.html",
+        context={"vacancies": vacancies, "total": len(vacancies)},
     )
 
 
