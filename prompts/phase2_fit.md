@@ -74,7 +74,7 @@ Output this block exactly — it becomes the top of JD_analysis.md:
 ```
 ## Quick Scan
 
-**Category:** [Primary archetype from Phase 1 section 1.4]
+**Category:** [Primary archetype from Phase 1 section 1.4] · [Remote / On-site / Hybrid]
 **Who they want:** [1 sentence from Summary above]
 **Why candidate fits / doesn't:** [1 sentence from Summary above]
 **Fit score:** X/10
@@ -92,6 +92,11 @@ Output this block exactly — it becomes the top of JD_analysis.md:
 - Mandatory technical stack the candidate lacks ("must code in Python")
 
 **Warnings** (soft flags — inform only, do not change Recommendation automatically):
+
+⚠️ CRITICAL: Warnings = APPLICATION PROCESS RISKS only. Do NOT put candidate gaps, missing skills,
+or fit concerns here — those belong in "Weak spots" and "Likely recruiter objections" above.
+
+Valid warning examples:
 - Evening availability / timezone overlap required
 - Mandatory travel
 - B2B only (no employment contract)
@@ -101,6 +106,13 @@ Output this block exactly — it becomes the top of JD_analysis.md:
 - 6+ step hiring pipeline
 - Mandatory test assignment
 - Early-stage company without confirmed funding
+- No salary mentioned
+- No public info about company
+
+Invalid (do NOT put in Warnings):
+- "no AI product launch experience" — candidate gap, goes in Weak spots
+- "no n8n/Make" — candidate gap, goes in Weak spots
+- "company may expect X" — speculation, not a concrete application risk
 
 If career track diverges significantly from PM/PO (e.g. Ops TL, Support Lead, Project Manager):
 add: `**Track note:** роль отличается от PM/PO — [1 sentence on the nature of difference]`
