@@ -160,6 +160,23 @@ def _extract_quick_scan(phase2_output: str) -> str:
     return phase2_output[:500].strip()
 
 
+def _strip_quick_scan_from_phase2(phase2: str) -> str:
+    """Remove ## Quick Scan block from Phase 2 body.
+
+    Quick Scan is placed at the top of the file separately — keeping it
+    inside phase2 body causes duplication in JD_analysis.md.
+    """
+    m = re.search(r"(?m)^##\s+Quick Scan\b", phase2, re.IGNORECASE)
+    if not m:
+        return phase2
+    # Find the next ## section after Quick Scan
+    rest = phase2[m.start():]
+    next_sec = re.search(r"(?m)^##\s+(?!Quick Scan)", rest, re.IGNORECASE)
+    if next_sec:
+        return (phase2[:m.start()] + rest[next_sec.start():]).strip()
+    return phase2[:m.start()].strip()
+
+
 def _build_analysis_file(
     title: str,
     url: str,
@@ -170,9 +187,10 @@ def _build_analysis_file(
     """Compose JD_analysis.md content.
 
     Quick Scan goes at the top (as required by phase2_fit.md prompt).
-    Full Phase 2 assessment and Phase 1 JD analysis follow.
+    Full Phase 2 assessment (without Quick Scan) and Phase 1 follow.
     """
     date = datetime.now().strftime("%Y-%m-%d")
+    phase2_body = _strip_quick_scan_from_phase2(phase2)
     return (
         f"# Analysis: {title}\n\n"
         f"Source: {url}\n"
@@ -181,7 +199,7 @@ def _build_analysis_file(
         f"{quick_scan}\n\n"
         f"---\n\n"
         f"## Phase 2: Candidate Fit Assessment\n\n"
-        f"{phase2}\n\n"
+        f"{phase2_body}\n\n"
         f"---\n\n"
         f"## Phase 1: JD Analysis\n\n"
         f"{phase1}\n"
