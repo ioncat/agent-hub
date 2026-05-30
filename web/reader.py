@@ -88,6 +88,7 @@ def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> Vacanc
     status: str     = row["status"] or "fetched"  # type: ignore[index]
     created_at: str = row["created_at"] or ""  # type: ignore[index]
     markdown_path: str | None = row["markdown_path"]  # type: ignore[index]
+    db_warnings: str = row["warnings"] if "warnings" in row.keys() else ""  # type: ignore[index]
 
     date = created_at[:10]  # "YYYY-MM-DD"
     safe_name = re.sub(r"[^\w\-]", "_", candidate_name)
@@ -122,6 +123,10 @@ def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> Vacanc
             blockers     = _extract(analysis_md, _BLOCK_RE)
         except OSError:
             pass
+
+    # Fallback: use DB warnings if JD_analysis.md didn't have the field
+    if not warnings and db_warnings:
+        warnings = db_warnings
 
     return VacancyView(
         id=vacancy_id,

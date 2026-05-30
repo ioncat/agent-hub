@@ -44,7 +44,16 @@ async def init_db() -> None:
 
     async with aiosqlite.connect(_db_path) as db:
         await db.executescript(schema)
-        await db.commit()
+        # Migrations: add columns introduced after initial schema
+        for migration in [
+            "ALTER TABLE vacancies ADD COLUMN warnings TEXT NOT NULL DEFAULT ''",
+        ]:
+            try:
+                await db.execute(migration)
+                await db.commit()
+                log.info("DB migration applied: %s", migration[:60])
+            except Exception:
+                pass  # column already exists — ignore
 
     log.info("DB initialised at %s", _db_path)
 
@@ -98,6 +107,16 @@ async def get_vacancy_by_id(vacancy_id: int) -> aiosqlite.Row | None:
             "SELECT * FROM vacancies WHERE id = ?", (vacancy_id,)
         )
         return await cursor.fetchone()
+
+
+async def update_vacancy_warnings(vacancy_id: int, warnings: str) -> None:
+    """Store semicolon-separated warnings for a vacancy."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET warnings = ? WHERE id = ?",
+            (warnings, vacancy_id),
+        )
+        await db.commit()
 
 
 async def update_vacancy_status(vacancy_id: int, status: str) -> None:

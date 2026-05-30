@@ -147,13 +147,28 @@ async def import_tracker(
             if status != "fetched":
                 await database.update_vacancy_status(vacancy_id, status)
 
+            # Import warnings if present
+            warnings = entry.get("warnings", "").strip()
+            if warnings:
+                await database.update_vacancy_warnings(vacancy_id, warnings)
+
             imported += 1
-            print(f"  ✅  #{vacancy_id:3d} {status:18s} | {vacancy_name[:55]}")
+            warn_tag = f" ⚠{len(warnings.split(';'))}" if warnings else ""
+            print(f"  ✅  #{vacancy_id:3d} {status:18s}{warn_tag} | {vacancy_name[:55]}")
 
         except Exception as exc:
             if "UNIQUE constraint" in str(exc) or "IntegrityError" in str(exc):
-                skipped += 1
-                print(f"  —   skip (duplicate): {vacancy_name[:55]}")
+                # Vacancy exists — still update warnings if tracker.json has them
+                warnings = entry.get("warnings", "").strip()
+                if warnings:
+                    existing = await database.get_vacancy_by_url(url)
+                    if existing:
+                        await database.update_vacancy_warnings(existing["id"], warnings)
+                        print(f"  ⚠   updated warnings for: {vacancy_name[:50]}")
+                    skipped += 1
+                else:
+                    skipped += 1
+                    print(f"  —   skip (duplicate): {vacancy_name[:55]}")
             else:
                 print(f"  ❌  error ({vacancy_name[:40]}): {exc}")
                 skipped += 1

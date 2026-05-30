@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS vacancies (
     markdown_path TEXT,                   -- path to JD.md on filesystem
     status        TEXT    NOT NULL DEFAULT 'fetched',
                                           -- fetched | analyzing | analyzed | generating | done | error
+    warnings      TEXT    NOT NULL DEFAULT '',
+                                          -- semicolon-separated soft flags (imported from tracker or analysis)
     created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 );
