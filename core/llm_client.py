@@ -28,15 +28,20 @@ import anthropic
 log = logging.getLogger(__name__)
 
 # ── Token pricing (USD per 1M tokens) ────────────────────────────────────────
-# Update when Anthropic changes rates or when switching models.
+# Source: https://anthropic.com/pricing (verified 2026-05-30)
+# Opus 4.x: $5/$25, Sonnet 4.x: $3/$15, Haiku 4.5: $1/$5
 _PRICING: dict[str, dict[str, float]] = {
-    "claude-opus-4-5":   {"input": 15.0,  "output": 75.0,  "cache_write": 18.75, "cache_read": 1.5},
-    "claude-opus-4":     {"input": 15.0,  "output": 75.0,  "cache_write": 18.75, "cache_read": 1.5},
-    "claude-sonnet-4-5": {"input": 3.0,   "output": 15.0,  "cache_write": 3.75,  "cache_read": 0.3},
-    "claude-sonnet-4":   {"input": 3.0,   "output": 15.0,  "cache_write": 3.75,  "cache_read": 0.3},
-    "claude-haiku-3-5":  {"input": 0.8,   "output": 4.0,   "cache_write": 1.0,   "cache_read": 0.08},
+    # Opus 4 family — $5/$25 input/output
+    "claude-opus-4-5":   {"input": 5.0,  "output": 25.0, "cache_write": 6.25, "cache_read": 0.50},
+    "claude-opus-4":     {"input": 5.0,  "output": 25.0, "cache_write": 6.25, "cache_read": 0.50},
+    # Sonnet 4 family — $3/$15 input/output
+    "claude-sonnet-4-5": {"input": 3.0,  "output": 15.0, "cache_write": 3.75, "cache_read": 0.30},
+    "claude-sonnet-4":   {"input": 3.0,  "output": 15.0, "cache_write": 3.75, "cache_read": 0.30},
+    # Haiku 4.5 — $1/$5 input/output
+    "claude-haiku-4-5":  {"input": 1.0,  "output": 5.0,  "cache_write": 1.25, "cache_read": 0.10},
+    "claude-haiku-3-5":  {"input": 0.8,  "output": 4.0,  "cache_write": 1.00, "cache_read": 0.08},
 }
-_PRICING_FALLBACK = {"input": 15.0, "output": 75.0, "cache_write": 18.75, "cache_read": 1.5}
+_PRICING_FALLBACK = {"input": 5.0, "output": 25.0, "cache_write": 6.25, "cache_read": 0.50}
 
 
 def _normalize_model(model: str) -> str:
