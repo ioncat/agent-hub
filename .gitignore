@@ -38,8 +38,19 @@ Thumbs.db
 # Project-specific
 config/profile.yaml
 vacancies/
-seen_jobs.json    # runtime file from job-board-monitor / emit_vacancy.py
-db/agent.db       # SQLite runtime DB — not versioned
+# runtime file from job-board-monitor / emit_vacancy.py
+seen_jobs.json
+# SQLite runtime DB — not versioned
+*.db
+*.sqlite
+*.sqlite3
+
+# Internal dev guidelines and discovery docs (not for public repos)
+CLAUDE.md
+docs/discovery/
+
+# Windows OS junk
+*.lnk
 
 # Chat logs / Q&A notes (local only)
 *Q&A*.md
