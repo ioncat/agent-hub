@@ -230,12 +230,13 @@ tool: cv_cover(vacancy_id)
 ```python
 # core/llm_client.py — ClaudeProvider
 system_prompt = [
-    {"type": "text", "text": PROFILE_MD, "cache_control": {"type": "ephemeral"}},
-    {"type": "text", "text": phase_prompt}   # phase-specific, not cached
+    {"type": "text", "text": PROFILE_MD,   "cache_control": {"type": "ephemeral"}},
+    {"type": "text", "text": phase_prompt, "cache_control": {"type": "ephemeral"}},  # also cached
 ]
 ```
 
-PROFILE.md cached → charged once per 5-min TTL. ~3 API calls per CV session → PROFILE cached after first.
+Both system blocks cached → charged once per 5-min TTL. Only the user turn (JD + prior-phase
+output) is uncached. ~3 API calls per CV session → static content cached after the first call.
 
 **Prompt files** (`agent-hub/prompts/`) — API-clean, no Claude Code artifacts, no file-save instructions. Agent handles all I/O.
 

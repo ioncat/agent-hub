@@ -3,7 +3,9 @@ core/llm_client.py — LLM abstraction layer.
 
 ClaudeProvider: Anthropic SDK with prompt caching.
   - PROFILE.md always sent as cache_control=ephemeral system block.
-  - Task system prompt appended as second block (no cache).
+  - Task (phase) system prompt appended as second block, also cache_control=ephemeral
+    (phase prompts are static and reused across vacancies).
+  - Only the user turn (JD text + prior-phase output) is uncached.
 
 OllamaProvider: stub — raises LLMUnavailableError unconditionally.
   Design rule: never silently fall back from Claude to Ollama.

@@ -79,8 +79,8 @@ async def test_complete_appends_task_system_as_second_block():
     system = mock_create.call_args.kwargs["system"]
     assert len(system) == 2
     assert system[1]["text"] == "Phase 3 prompt here"
-    # Task system block has NO cache_control
-    assert "cache_control" not in system[1]
+    # Task system block is also cached — phase prompts are static and reused
+    assert system[1]["cache_control"] == {"type": "ephemeral"}
 
 
 @pytest.mark.asyncio
