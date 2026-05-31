@@ -1,26 +1,33 @@
 # agent-hub
 
-Personal AI agent for the job application pipeline.  
-Drop a vacancy URL — get a fit analysis, tailored CV, and cover letter — all in Telegram.
+Personal multi-agent hub for workflow automation.  
+**CV pipeline is the first agent** — more domains planned. The hub orchestrates purpose-built services that were already developed independently; agent-hub connects them into automated pipelines.
+
+> 🚧 Actively in development
 
 ---
 
-## How it works
+## User Journey — CV Agent
+
+New jobs are discovered **automatically** via RSS. The agent notifies via Telegram — user only makes decisions.  
+Manual URL input is an option, not the default.
 
 ```mermaid
 flowchart LR
-    A["🔔 New job\nDjinni / DOU"] --> B["Telegram\nAnalyze?"]
-    B -->|✅ Yes| C["Fit analysis\nScore · Verdict · Barriers"]
+    M["job-board-monitor\nRSS auto-discovery"] -->|"pushes new vacancy"| A
+    A["🔔 Telegram\nNew job at X — Analyze?"]
+    A -->|✅ Yes| C["Fit analysis\nScore · Verdict · Barriers"]
     C --> D["Telegram\nGenerate CV?"]
     D -->|📄 Yes| E["AI drafts CV\n+ self-review pass"]
     E --> F["User approves\nvia Telegram"]
-    F --> G["📎 PDF\ndelivered"]
+    F --> G["📎 PDF delivered"]
     G --> H["Telegram\nCover letter?"]
     H -->|✉️ Yes| I["Cover letter\ndelivered"]
-    B -->|❌ Skip| Z["Archived"]
+    A -->|❌ Skip| Z["Archived"]
+    U["Manual option\nTelegram URL / JD.md drop"] -.->|fallback| A
 ```
 
-**Zero manual work for routine steps.** User only makes decisions — approve, skip, or request changes.
+**User's only job:** approve or skip. Everything else runs automatically.
 
 ---
 
@@ -66,7 +73,7 @@ flowchart TB
         Web["Web Tracker\nFastAPI + HTMX + Jinja2"]
     end
 
-    subgraph "Companion Services"
+    subgraph "Pipeline Services"
         KMP["knowledge-mirror-parser\nURL → Markdown\nHTTP POST /parse"]
         CBK["callback-cv\nPROFILE.md · prompts · cv_to_pdf\nfilesystem + subprocess"]
     end
