@@ -114,13 +114,3 @@ The agent's value is **orchestration** — it connects three independently built
 | `callback-cv` | Candidate profile · tailored prompts · PDF generation — the CV engine | Filesystem + subprocess |
 | `job-board-monitor` | RSS watcher — turns job boards into a real-time feed | `seen_jobs.json` |
 
----
-
-## Quick Start
-
-```bash
-cp .env.example .env          # ANTHROPIC_API_KEY + TELEGRAM_BOT_TOKEN
-docker-compose up -d          # agent-hub + kmp-service
-python agent.py               # run without Docker
-uvicorn web.api:app --reload  # web tracker → localhost:8080
-```
