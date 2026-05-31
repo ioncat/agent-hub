@@ -56,12 +56,15 @@ The leverage is your profile: onboard once, and the platform turns deep JD analy
 
 ## What the CV Agent does
 
-For every incoming vacancy, the agent runs a decision-first pipeline:
+A **job counselor**, not a CV generator. Two distinct layers of value:
 
-- **Deep JD analysis** — goes beyond keywords. Understands the pain the employer is actually trying to solve, surfaces hidden requirements, flags company/role context risks
-- **Honest fit verdict** — score, key barriers, archetype match. If the fit is weak → the system says *don't apply* and explains why. No false encouragement, no wasted energy.
-- **Tailored CV on demand** — only if worth applying. Generates a CV that maximally surfaces relevant experience for this specific role and reframes it to answer what the JD is really asking for
-- **Time saved, not just effort saved** — the pipeline runs automatically. The user only makes go/no-go calls.
+**Layer 1 — Decision support**
+Read the vacancy deeply. Understand the employer's real pain, not just the listed requirements. Give the candidate an honest answer: *is this worth your time?* If the fit is weak — say so clearly, explain why, and save them the effort. No false encouragement.
+
+**Layer 2 — Execution support**
+If the answer is yes: prepare the candidate's best possible pitch. Not a generic CV about them — a targeted story about *why they are the answer to this employer's specific problem*, told through their strongest, most relevant experience.
+
+The counselor is only as good as what it knows about the candidate. That's why onboarding matters: the deeper the profile, the sharper the story.
 
 ---
 
