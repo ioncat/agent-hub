@@ -66,6 +66,22 @@ Do not use any other separator. The parser relies on `---CV---` to extract the C
 
 ---
 
+## Phase 2 Implementation Check
+
+Before the review output, verify three things from `JD_analysis.md`:
+
+1. **Adaptation Plan** — list each action from Phase 2 `## Adaptation Plan`. Mark each:
+   - ✅ applied in draft
+   - ❌ not applied — add to 🔧 Strengthen / reframe
+
+2. **Fit Breakdown ⚠️ items** — are bridgeable gaps addressed or reframed in the CV?
+   If not → add to 🔧 Strengthen / reframe
+
+3. **Fit Breakdown ❌ items** — are they properly absent (not fabricated or implied)?
+   If any ❌ item appears in the draft → add to ❌ Remove / doesn't fit
+
+---
+
 ## Rules
 
 - If no issues in a category, write `• нет замечаний` — do not skip the category header

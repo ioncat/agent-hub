@@ -197,7 +197,11 @@ class ClaudeProvider:
             }
         ]
         if system:
-            system_parts.append({"type": "text", "text": system})
+            system_parts.append({
+                "type": "text",
+                "text": system,
+                "cache_control": {"type": "ephemeral"},
+            })
 
         # Extended Thinking: max_tokens must exceed budget_tokens (API requirement)
         max_tok = self._max_tokens

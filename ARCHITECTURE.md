@@ -337,6 +337,46 @@ class OllamaProvider(BaseLLMProvider):
 
 ---
 
+## User Profile Schema
+
+**Current state:** single user (Oleksii Bondarenko). Profile lives in `callback-cv/skill/PROFILE.md`.
+
+**Profile file** (`PROFILE.md`) is the canonical source of user identity for all LLM calls.
+Sent as first cached system block on every Claude API call (`cache_control: ephemeral`).
+
+### Required fields (current schema)
+
+| Field | Location | Description |
+|-------|----------|-------------|
+| Name variants | PROFILE.md `## Name variants` | EN formal/informal + native |
+| Contact info | PROFILE.md header | email, Telegram, LinkedIn, GitHub |
+| Summary | PROFILE.md `## Summary` | 3–5 sentence positioning statement |
+| Experience | PROFILE.md `## Experience` | Chronological, metrics-backed |
+| Skills / Certs | PROFILE.md | Top skills, languages, certifications |
+| Honest Gaps | PROFILE.md `## Honest Gaps` | Things LLM must never fabricate |
+| **Archetype** | PROFILE.md `## Archetype & Role Positioning` | See below |
+
+### Archetype field (added 2026-05-31)
+
+`archetype_preference: execution | founder | dual`
+
+Drives Phase 2 analysis behavior:
+- **execution** — emphasize delivery track, metrics, coordination
+- **founder** — emphasize 0→1, co-founder experience, autonomy
+- **dual** — LLM checks JD archetype signal, picks framing dynamically
+
+Archetype delta (JD archetype ≠ CV framing) generates **both**:
+- Warning: flags the mismatch for user attention
+- Adaptation Plan: specific reframing advice from the matching archetype section
+
+### Multi-user (planned — BACKLOG P2)
+
+When generalized: each user gets isolated `PROFILE.md` + vacancies folder + DB namespace.
+Onboarding collects all schema fields above via Telegram conversation.
+See `BACKLOG.md → P2 — Onboarding` for full field list.
+
+---
+
 ## Design Decisions Log
 
 **2026-05-28:**

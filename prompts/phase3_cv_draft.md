@@ -94,3 +94,19 @@ Based on role archetype from Phase 1:
 - Operations/BizOps → lead with automation, process ownership, operational metrics
 
 Emphasis = adjust language and which Key Results to surface first. Not deleting entries.
+
+---
+
+## Adaptation Plan Implementation
+
+`JD_analysis.md` contains `## Adaptation Plan` from Phase 2. Implement ALL listed actions in this draft.
+
+**Archetype mismatch handling** (if flagged in Phase 2 Key Barriers or Adaptation Plan):
+- JD wants Founder Proxy → lead with SBC co-founder + Marketplace MVP 0→1; reframe HostiServer as "built from scratch" narrative; downplay InsulaLabs execution/coordination framing
+- JD wants Executor → lead with HostiServer metrics track record; keep InsulaLabs; de-emphasize co-founder angle
+- If not flagged → use default Tailoring Logic above
+
+**Fit Breakdown ⚠️ items** (from Phase 2): where candidate has partial/pet-project evidence —
+address by reframing existing experience. Do NOT fabricate. Do NOT claim ✅ if profile shows ⚠️.
+
+**Fit Breakdown ❌ items**: do not mention, do not fabricate, do not imply.

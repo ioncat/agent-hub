@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Vacancy Tracker</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='15' fill='%23F5C518'/><text x='16' y='21' font-family='Arial,sans-serif' font-size='10' font-weight='bold' fill='black' text-anchor='middle'>A-H</text></svg>">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;background:#f4f4f5;color:#1a1a1a;padding:24px}
@@ -91,15 +92,14 @@
     </tr>
   </thead>
   <tbody id="tbody">
-  {% set ns = namespace(last_date='', idx=0) %}
+  {% set ns = namespace(last_date='') %}
   {% for v in vacancies %}
     {% if v.date != ns.last_date %}
     <tr class="date-sep"><td colspan="9">{{ v.date }}</td></tr>
     {% set ns.last_date = v.date %}
     {% endif %}
-    {% set ns.idx = ns.idx + 1 %}
-    <tr class="{{ v.rec_class }}" data-idx="{{ ns.idx }}">
-      <td class="num">{{ ns.idx }}<span class="expand-btn" onclick="toggleExpand({{ ns.idx }},this)" title="Show analysis">▶</span></td>
+    <tr class="{{ v.rec_class }}" data-idx="{{ v.id }}">
+      <td class="num">{{ v.id }}<span class="expand-btn" onclick="toggleExpand({{ v.id }},this)" title="Show analysis">▶</span></td>
       <td class="vname"><a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a></td>
       <td class="fit">{{ v.fit_score }}</td>
       <td>
@@ -112,7 +112,7 @@
       <td>{% if v.has_cover %}<span class="tick">✓</span>{% else %}<span class="cross">—</span>{% endif %}</td>
       <td>{% if v.has_pdf %}<span class="tick">✓</span>{% else %}<span class="cross">—</span>{% endif %}</td>
     </tr>
-    <tr class="expand-row" data-for="{{ ns.idx }}" style="display:none">
+    <tr class="expand-row" data-for="{{ v.id }}" style="display:none">
       <td colspan="9">
         <div class="analysis-body">
           {% if v.has_analysis %}{{ v.analysis_md | markdown | safe }}{% else %}<em>No analysis yet.</em>{% endif %}

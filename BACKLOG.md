@@ -17,6 +17,48 @@
 
 ---
 
+## P1 — Pipeline Cost Preview (pre-run estimate)
+
+**Feature:** Before starting full pipeline processing, agent sends user an estimated cost breakdown.
+
+**Trigger:** after `cv_fetch_jd` completes — JD.md is on disk, size is known.
+
+**How it works:**
+- Estimate input tokens per phase using JD size + known PROFILE.md size + prompt sizes (all static)
+- Use historical average output tokens per phase from `llm_usage` DB (`AVG(output_tokens) GROUP BY phase`)
+- Calculate estimated total cost across all phases using `_calc_cost()`
+- Send Telegram message before any LLM calls:
+
+```
+💰 Оценка бюджета — [Vacancy title]
+JD: ~N tokens
+
+Phase 1 (анализ):    ~$0.04
+Phase 2 (фит):       ~$0.06
+Phase 3 (CV draft):  ~$0.05
+Phase 3.5 (review):  ~$0.07
+Phase 4 (cover):     ~$0.05
+─────────────────────
+Итого:               ~$0.27
+
+Запустить полный pipeline? [Да] [Только анализ] [Отмена]
+```
+
+**Implementation notes:**
+- Phase 1/2 estimate: `(profile_tokens + prompt_tokens + jd_tokens) × input_price + avg_output × output_price`
+- Phase 3/3.5/4 estimate: `(profile_tokens + prompt_tokens + jd_tokens + avg_analysis_output) × price + avg_output × output_price`
+- Fallback if no historical data: use hardcoded baseline averages from `docs/discovery/Tokenomics.md`
+- Cache savings included: Phase 2–4 use cache_read price for PROFILE.md tokens
+- Thinking tokens: included for Phase 1+2 (avg thinking from DB or budget_tokens × 0.35 as estimate)
+- New helper: `tools/cv_estimate.py` or inline in `cv_fetch_jd.py` post-fetch
+
+**Why useful:**
+- User sees cost before committing to full run
+- Enables selective runs ("только анализ" without generate+cover)
+- Foundation for budget alerts ("это дороже обычного — JD очень длинный")
+
+---
+
 ## P2 — Onboarding
 
 - [ ] **Multi-user onboarding flow** (Telegram-native):
@@ -24,6 +66,13 @@
   - PDF → Markdown conversion → personalized PROFILE.md generated
   - Follow-up refinement: name variants (EN/UA), what to highlight vs. hide per role type,
     experience framing rules per vacancy archetype
+  - **Onboarding fields (profile schema):**
+    - `archetype_preference`: `execution` | `founder` | `dual` — drives Phase 2 adaptation advice
+    - `archetype_execution_highlights`: which roles/projects to surface for execution JDs
+    - `archetype_founder_highlights`: which roles/projects to surface for 0→1/founder JDs
+    - `honest_gaps`: list of things never to fabricate (no-code tools, A/B testing, etc.)
+    - `name_variants`: EN formal/informal + native language variants
+    - `target_roles`: list of role types candidate is targeting
   - Each user gets isolated profile + vacancies folder + separate DB namespace
   - RSS feeds stored per-user, watcher spawned per-user on login
   - **Web tracker becomes multi-user:** per-user auth (Telegram login or token), filtered view by user_id

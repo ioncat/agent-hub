@@ -1,7 +1,7 @@
 # Tokenomics — agent-hub CV Pipeline
 
-> Last updated: 2026-05-30 (v3)
-> Current model: claude-sonnet-4-6 + Extended Thinking (budget=10k, phase1+2 only)
+> Last updated: 2026-05-31 (v6)
+> Current model: claude-sonnet-4-6 + Extended Thinking (budget=3k, phase1+2 only)
 > Source of truth for all cost analysis and unit economics
 
 ---
@@ -51,8 +51,11 @@ Cost formula: `(input × $5 + output × $25) / 1_000_000`
 | v2 | 2026-05-30 | analyze+generate+cover, одна сессия | 32 556 | 6 286 | $0.320 | **$0.32** ✅ | $0.000 | Исправленные промпты. Кэш не работал (beta header fix после прогона) |
 | v3 | 2026-05-30 | analyze only (2 calls) | 5 361+1731 cache | 5 347 | $0.1033 | **~$0.103** ✅ | $0.000 | sonnet-4-6 + thinking(10k). Кэш работает (cache_read phase2). Quick Scan пустой — баг code fence в промпте. |
 | v4 | 2026-05-30 | analyze only (2 calls) | 5 265+1731 cache | 4 994 | $0.0977 | **~$0.098** ✅ | $0.000 | Quick Scan исправлен. Кэш работает. Анализ на русском. Качество высокое. |
+| v5 | 2026-05-31 | analyze only (2 calls) | 6 559+4803 cw+2159 cr | 6 178 | $0.1226 | **~$0.123** ✅ | $0.000 | ⚠️ BROKEN RUN — Phase 2 пустой (баг: `### Quick Scan` конфликтовал с `## Quick Scan` в промпте). Оплачен, данные в Anthropic. |
+| v6 | 2026-05-31 | analyze only (2 calls) | 2 879+2696 cw+5180 cr | 5 461 | $0.1022 | **~$0.102** ✅ | $0.000 | Фикс: instruction-заголовки `**[OUTPUT SECTION N]**` вместо `###`. Phase 2 полный: Quick Scan + Fit Breakdown + Adaptation Plan + Internal Analysis. Score 5.5/10. |
 
 **Total day 2026-05-30 (v1+v2 на Opus):** in=67 158, out=13 133 → fact=$0.66 (Anthropic console)
+**Total day 2026-05-31 (v5+v6 на Sonnet):** in=10 722+10 755, out=6 178+5 461 → fact=$0.22 (CSV confirmed)
 
 ---
 
@@ -75,8 +78,15 @@ Cost formula: `(input × $5 + output × $25) / 1_000_000`
 | 9 | v3 | phase1 | 1 560 | 2 008 | $0.0413 | sonnet-4-6, cache_write=1731, thinking=30tok, elapsed=40s, budget=10k |
 | 10 | v3 | phase2 | 3 801 | 3 339 | $0.0620 | sonnet-4-6, cache_read=1731, thinking=1043tok, elapsed=71s, budget=10k |
 | **v3 total** | | phase1+2 only | **5 361** | **5 347** | **$0.1033** | |
+| — | v5 | phase1 | 3 859 | 2 101 | $0.0617 | sonnet-4-6, broken run, cache_write=4803, phase2 prompt bug |
+| — | v5 | phase2 | 6 863 | 4 077 | $0.0609 | Phase 2 output empty — `### Quick Scan` instruction header conflicted with `## Quick Scan` output template |
+| **v5 total** | | phase1+2 only | **10 722** | **6 178** | **$0.1226** | ⚠️ broken, do not use as quality baseline |
+| — | v6 | phase1 | 3 859 | 2 049 | ~$0.046 | cache_write=2696 (cold for phase1 prompt), budget=3k |
+| — | v6 | phase2 | 6 896 | 3 412 | ~$0.056 | cache_read=5180 (warm from v5), full output: QS+FitBreakdown+AdaptPlan+Internal |
+| **v6 total** | | phase1+2 only | **10 755** | **5 461** | **$0.1022** | ✅ Full new prompt structure working |
 
 > v3 input breakdown (estimated, len//4): profile=1779, prompt_phase1=702 / prompt_phase2=927, user_phase1=512 / user_phase2=1812
+> v6 platform totals (non_cache+cache_write+cache_read): phase1=3859, phase2=6896. Console: non_cache=2879, cache_write=2696, cache_read=5180
 
 **Самая дорогая фаза:** Phase 3.5 (23% бюджета v2) — туда идёт весь контекст: JD + анализ + CV draft.
 
@@ -145,7 +155,33 @@ SELECT DATE(created_at), ROUND(SUM(cost_usd),4) FROM llm_usage GROUP BY DATE(cre
 
 ---
 
-## 7. Observations & Open Questions
+## 7. Заметка о параметре `budget_tokens` и его связи с `max_tokens`
+
+> ⚠️ Рекомендационная заметка. Поведение моделей может измениться непредсказуемо. Основана на наблюдениях 2026-05-30, не на официальной документации.
+
+**Что такое `budget_tokens`:**
+Верхний лимит на количество thinking токенов. Модель не превысит этот порог. Но сколько реально использовать — решает сама.
+
+**Связь с `max_tokens`:**
+В нашей реализации `max_tokens` автоматически поднимается до `budget_tokens + 4096` (требование API — max_tokens должен превышать budget_tokens). Это влияет на максимально возможный размер всего ответа (thinking + текст).
+
+**Влияет ли бюджет на поведение модели:**
+По наблюдениям — предположительно да. Большой бюджет (10k) может сигнализировать модели "думай глубже". Маленький бюджет (3k) — "будь лаконичнее в рассуждениях". Но это не задокументировано и может быть просто артефактом наблюдений.
+
+**Влияет ли бюджет на стоимость:**
+Нет — напрямую. Биллинг по фактически использованным thinking токенам, а не по бюджету. Если используется 1043 из 10000 — платишь за 1043.
+
+**Зачем тогда снижать бюджет:**
+Защитный потолок. Если однажды на сложной вакансии модель решит думать 8000 токенов — лимит остановит. При budget=3k и фактическом использовании ~1043 — запас 3× достаточен, неожиданных трат нет.
+
+**Наши значения:**
+- phase1: фактически ~30 thinking токенов из 10k → снижено до 3k
+- phase2: фактически ~1043 thinking токенов из 10k → снижено до 3k
+- Запас при budget=3k: phase1 = 100×, phase2 = 3×
+
+---
+
+## 8. Observations & Open Questions
 
 - **Формула точная** — delta $0.00 на v2, $0.004 на v1 ✅
 - **Кэш работает в v3** ✅ — cache_read=1731 на phase2, SDK 0.105.2 (betas параметр убран, prompt caching теперь GA)
@@ -157,7 +193,11 @@ SELECT DATE(created_at), ROUND(SUM(cost_usd),4) FROM llm_usage GROUP BY DATE(cre
 - **✅ Формула `_calc_cost()` правильная** — thinking токены биллятся как output ($15/MTok). Первый CSV для v3 показал $0.04 из-за **billing lag** (данные не успели появиться). Второй CSV (после v4) подтверждает: v3≈$0.103, v4≈$0.098 — совпадает с нашим расчётом.
 - **v3+v4 дешевле v2 при лучшем качестве:** ~$0.10 за 2 analysis фазы (vs $0.138 Opus v2) — **28% экономия** при смене на sonnet-4-6 + thinking.
 - **Данные из консоли (sonnet-4-6, все вызовы):** v3 phase1=3291in/2008out, phase2=5532in/3339out; v4 phase1=3291in/1932out. CSV total: input_no_cache=$0.03, cache_write=$0.01, cache_read=$0.00, output=$0.16.
-- **Quick Scan баг:** code fence в промпте сбивает модель → пустой блок. Фикс: убрать ``` из примера в phase2_fit.md
+- **Quick Scan баг v3:** code fence в промпте сбивает модель → пустой блок. Фикс: убрать ``` из примера в phase2_fit.md
+- **Phase 2 структурный баг v5:** `### Quick Scan` как instruction-заголовок в промпте конфликтовал с output `## Quick Scan`. Модель писала контент под `###`, оставляла `##` пустым. Фикс: все instruction-заголовки → `**[OUTPUT SECTION N — Name]**`.
+- **Cache cascade v5→v6:** v5 кэширует phase1 prompt (cache_write=4803), v6 читает его (cache_read=5180). cache_read v6 в 2.4× выше чем v5. Промпт-кэш работает корректно между прогонами.
+- **v6 output меньше v5 при полном выводе:** out=5461 vs v5=6178 — несмотря на то что v6 генерирует всё 4 секции Phase 2. v5 генерировал только Phase 1 (broken Phase 2). Вывод: Phase 2 full output ≈ 3412 output tokens.
+- **2026-05-31 CSV total $0.22** = v5($0.1226) + v6($0.1022). Формула точна ✅
 
 ---
 
@@ -169,3 +209,4 @@ SELECT DATE(created_at), ROUND(SUM(cost_usd),4) FROM llm_usage GROUP BY DATE(cre
 | 2026-05-30 | v1+v2 прогоны, формула верифицирована. Beta header fix. Таблица перенесена в docs/discovery/. |
 | 2026-05-30 | v3: смена на sonnet-4-6, Extended Thinking (budget=10k), кэш подтверждён. DB schema расширена (profile/prompt/user/budget/thinking/elapsed). Старый .claude/memory/token-tracking.md удалён. |
 | 2026-05-30 | v4: исправлен Quick Scan (code fence убран из промпта). Billing lag в первом CSV подтверждён — формула _calc_cost() верна, thinking токены биллятся как output. |
+| 2026-05-31 | v5 (broken): новые Phase 2 промпты, но `### Quick Scan` конфликт → Phase 2 пустой. v6: фикс instruction-заголовков, полный вывод Phase 2 (4 секции). Score 5.5/10. CSV $0.22 = v5+v6 ✅ |
