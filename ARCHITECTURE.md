@@ -438,3 +438,20 @@ See `BACKLOG.md → P2 — Onboarding` for full field list.
   - SaaS infrastructure (auth, billing, per-user RSS workers, web auth) added incrementally as user base grows.
 
 - **Project rename.** "agent-hub" no longer reflects the product identity — it has become a focused vertical service, not a generic hub. Name TBD; tracked in backlog.
+
+**2026-05-31 — Strategic decisions:**
+
+- **AI agents ready — MCP server + REST API.**
+  The platform must be accessible not only to humans but to AI agents and orchestrators. Two layers:
+  - **REST API** — extend existing FastAPI with pipeline endpoints: `POST /analyze`, `POST /generate`, `GET /vacancy/{id}/report`. Enables any HTTP client to trigger the pipeline programmatically.
+  - **MCP server** — expose Career Agent as MCP tools (`analyze_vacancy`, `get_fit_report`, `generate_cv`). Any MCP-compatible client (Claude Desktop, Claude Code, custom agents) can invoke the pipeline as a tool call.
+  - Result: Career Agent becomes a composable component in broader agentic workflows, not just a standalone product.
+  - Architecture: tools layer unchanged — MCP/API are additional transport layers, same as Telegram bot today.
+
+- **UI channel strategy — channel-agnostic architecture.**
+  Telegram is dominant in CIS and parts of EU but niche in the US and Western Europe. There is no Western equivalent with the same combination of rich interactive UI (inline buttons, file sharing, push) and personal (non-corporate) context. Strategy:
+  - **Telegram** — primary channel now. Stays for CIS + EU markets.
+  - **PWA (Progressive Web App)** — next step for Western markets. Extends existing FastAPI + HTMX web tracker. Push notifications (Chrome/Firefox/Safari 16.4+), approve/skip buttons natively in web, PDF delivery. No App Store friction, no install required. Minimum new code — evolution of existing tracker.
+  - **WhatsApp Business API** — secondary for EU / LatAm / global markets. Personal channel, dominant outside US. Limited interactive buttons (up to 3), complex Meta approval process. Deferred until PMF validated.
+  - **Flutter (native mobile)** — long-term option when PMF confirmed and user base justifies App Store overhead.
+  - **Architecture rule:** UI layer is channel-agnostic. Telegram bot is one adapter (`TelegramAdapter`). Adding Slack, WhatsApp, PWA push = new adapter, tools layer unchanged. Rename `core/telegram.py` concept to `notification_channel` in next refactor.

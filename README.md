@@ -1,25 +1,12 @@
-# agent-hub
+# Hiring is broken. You can fix your side.
 
-**A multi-agent AI operations platform.** Each agent automates one domain end-to-end; the platform orchestrates independent services into workflows. New agents are added over time — this is a growing platform, not a single tool.
-
-### Agent roster
-
-| # | Agent | Domain | Status |
-|---|-------|--------|--------|
-| 1 | **CV Agent** | Job applications — analyze fit, decide, tailor CV | 🟢 In production |
-| 2 | — | *Personal notes, knowledge & content classification and management* | ⚪ Upcoming |
-
-> 🚧 **Actively in development.** The platform is expanding — the CV Agent is the first of many.
-
----
-
-## Hiring is broken. You can fix your side.
+**Career Agent** — *For your next career move*
 
 Job search has become needlessly hard. Employers bury their real pain inside generic JDs. Candidates fire off generic CVs hoping something lands. Both sides drown in noise.
 
 **Our belief:** a good match is a conversation of relevance. The employer states the problem they need solved. The candidate understands it and responds with their strongest, most relevant evidence.
 
-**Today** the platform serves the candidate side: it reads the employer's real intent out of the JD, judges honest fit, and surfaces the candidate's strongest relevant story — or tells them to walk away.
+**Today** Career Agent serves the candidate side: it reads the employer's real intent out of the JD, judges honest fit, and surfaces the candidate's strongest relevant story — or tells them to walk away.
 
 **North star:** close the loop on both sides, so employers and candidates reach the most relevant offers to each other.
 
@@ -42,19 +29,17 @@ Most tools help you write faster. This system answers two questions, in order:
 1. **Should you apply?** — an honest read of the vacancy and your real fit. Weak odds → it tells you to skip.
 2. **How do you win this one?** — if worth it, a CV that puts your strongest, most relevant sides forward.
 
-The leverage is your profile: onboard once, and the platform turns deep JD analysis into a winning pitch — automatically, for every vacancy.
+The leverage is your profile: onboard once, and Career Agent turns deep JD analysis into a winning pitch — automatically, for every vacancy.
 
 ---
 
 ## Product Vision
 
-**Agent Hub is a personal AI operations platform** — a home for domain agents that grows over time (see the [agent roster](#agent-roster) above).
-
-**Core idea:** specialized services remain independent, reusable products. Agent Hub orchestrates them into end-to-end workflows — without absorbing them. Adding a new domain means adding an agent, not rebuilding the platform.
+**Career Agent is a focused vertical service** — purpose-built for PM job search. Tight pipeline by design: each phase solves a specific problem for the job seeker, nothing more.
 
 ---
 
-## What the CV Agent does
+## How it works
 
 A **job counselor**, not a CV generator. Two distinct layers of value:
 
@@ -68,14 +53,14 @@ The counselor is only as good as what it knows about the candidate. That's why o
 
 ---
 
-## User Journey — CV Agent
+## User Journey
 
-New jobs are discovered **automatically** via RSS. The agent notifies via Telegram — the user only makes decisions.  
+New jobs are discovered **automatically** via RSS. The user is notified and only makes decisions — approve or skip.  
 Manual URL input is an option, not the default.
 
 ```mermaid
 flowchart LR
-    M["job-board-monitor\nRSS auto-discovery"] -->|"pushes new vacancy"| A
+    M["services/job-monitor/\nRSS auto-discovery"] -->|"pushes new vacancy"| A
     A["🔔 Telegram\nNew job at X — Analyze?"]
     A -->|✅ Yes| C["Deep JD Analytics\nScore · Verdict · Barriers"]
     C --> D["Telegram\nGenerate CV?"]
@@ -124,8 +109,8 @@ flowchart TD
 | **Decision-first pipeline** — analyze fit before generating anything | Generate CV for every vacancy | Effort should follow a go/no-go verdict, not precede it. Don't optimize a document the user shouldn't send. |
 | **RSS-first workflow** — jobs are pushed to the user | Manual vacancy search | Users should *evaluate* opportunities, not spend time *finding* them. |
 | **Telegram as primary UI** | Web app / dedicated client | Zero install, already in the user's pocket, native push + inline approve/skip buttons. The interaction is decisions, not browsing. |
-| **Independent services** | Single monolith application | Each service stays reusable and independently evolvable. The parser, CV engine, and monitor are products in their own right. |
-| **Orchestration over absorption** | Rebuild every capability inside the hub | Reuse existing, battle-tested tools. The hub's value is connecting them, not replacing them. |
+| **Channel-agnostic architecture** | Telegram-only forever | Telegram is primary today (CIS/EU). PWA and WhatsApp added as adapters when needed — tools layer unchanged. |
+| **Monorepo — all services inside** | Permanent external dependencies | All user-built services live inside `services/`. Audit before migrating — cut dead code, keep only what the pipeline needs. |
 | **Human-in-the-loop on irreversible steps** | Full auto-apply | The user owns the apply/skip and CV-approval calls. Automation removes toil, not judgment. |
 
 ---
@@ -135,21 +120,21 @@ flowchart TD
 ```mermaid
 flowchart TB
     subgraph Inputs
-        RSS["job-board-monitor\nRSS → seen_jobs.json"]
-        User["User · Telegram"]
+        RSS["services/job-monitor/\nwebhook push"]
+        User["User · Telegram / PWA"]
     end
 
-    subgraph "agent-hub"
-        TG["Telegram Bot\naiogram 3.x"]
-        RT["Router\nPydanticAI Agent"]
+    subgraph "Career Agent"
+        TG["Notification Channel\nTelegram (primary) · PWA"]
+        RT["Router\nPydanticAI"]
         Tools["Tools\ncv_fetch · cv_analyze · cv_generate · cv_cover"]
         LLM["LLM Client\nClaude Sonnet 4.6\nprompt caching + extended thinking"]
-        Web["Web Tracker\nFastAPI + HTMX + Jinja2"]
+        Web["Web Tracker\nFastAPI + HTMX"]
     end
 
-    subgraph "Pipeline Services"
-        KMP["knowledge-mirror-parser\nURL → Markdown\nHTTP POST /parse"]
-        CBK["callback-cv\nPROFILE.md · prompts · cv_to_pdf\nfilesystem + subprocess"]
+    subgraph "services/"
+        KMP["parser/\nURL → Markdown\nHTTP POST /parse"]
+        PDF["pdf/\nMarkdown → PDF\nHTTP POST /render"]
     end
 
     subgraph Storage
@@ -162,7 +147,7 @@ flowchart TB
     RT --> Tools
     Tools --> LLM
     Tools --> KMP
-    Tools --> CBK
+    Tools --> PDF
     Tools --> DB & FS
     Web --> DB
 ```
@@ -174,16 +159,4 @@ flowchart TB
 | HTTP | httpx async |
 | Storage | SQLite + filesystem |
 | Config | `config/profile.yaml` · `config/llm.yaml` |
-| Deploy | Docker Compose — agent-hub + kmp-service |
-
----
-
-## Built on existing tools
-
-The platform's value is **orchestration** — it connects three independently built services into one pipeline. Each was useful alone; together they enable automation none could do individually.
-
-| Repo | What it brings | Interface |
-|------|----------------|-----------|
-| `knowledge-mirror-parser` | URL → clean Markdown — any job board becomes parseable input | HTTP `POST /parse` |
-| `callback-cv` | Candidate profile · tailored prompts · PDF generation — the CV engine | Filesystem + subprocess |
-| `job-board-monitor` | RSS watcher — turns job boards into a real-time feed | `seen_jobs.json` |
+| Deploy | Docker Compose — career-agent · services/ |
