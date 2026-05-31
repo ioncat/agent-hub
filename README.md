@@ -7,6 +7,17 @@ Personal multi-agent hub for workflow automation.
 
 ---
 
+## Why it exists
+
+Job applications are expensive — they cost time, energy, and focus. Most people apply hoping for the best. This system does the opposite: **it tells you whether to apply before you invest anything.**
+
+- **Deep JD analysis** — goes beyond keywords. Understands what the hiring manager is actually trying to solve, surfaces hidden requirements, flags company/role context risks
+- **Honest fit verdict** — score, key barriers, archetype match. If the fit is weak → the system says don't apply and explains why. No false encouragement.
+- **Tailored CV on demand** — if worth applying, generates a CV that maximally surfaces relevant experience for this specific role, reframes it to match what the JD is really asking for
+- **Saves your time, not just your effort** — the pipeline runs automatically. User only makes go/no-go calls.
+
+---
+
 ## User Journey — CV Agent
 
 New jobs are discovered **automatically** via RSS. The agent notifies via Telegram — user only makes decisions.  
@@ -16,7 +27,7 @@ Manual URL input is an option, not the default.
 flowchart LR
     M["job-board-monitor\nRSS auto-discovery"] -->|"pushes new vacancy"| A
     A["🔔 Telegram\nNew job at X — Analyze?"]
-    A -->|✅ Yes| C["Fit analysis\nScore · Verdict · Barriers"]
+    A -->|✅ Yes| C["Deep JD Analytics\nScore · Verdict · Barriers"]
     C --> D["Telegram\nGenerate CV?"]
     D -->|📄 Yes| E["AI drafts CV\n+ self-review pass"]
     E --> F["User approves\nvia Telegram"]
