@@ -71,7 +71,7 @@ flowchart LR
 
 ## AI Pipeline
 
-Five-phase Claude API pipeline. `PROFILE.md` cached — charged once per session window.
+Five-phase Claude API pipeline. All static system content — `PROFILE.md` **and** every phase prompt — is prompt-cached; only the per-vacancy text (JD + prior-phase output) is charged at full rate.
 
 ```mermaid
 flowchart TD
@@ -146,7 +146,7 @@ flowchart TB
 
 | Layer | Tech |
 |-------|------|
-| AI | Claude Sonnet 4.6 · PydanticAI · prompt caching |
+| AI | Claude Sonnet 4.6 · PydanticAI · prompt caching (profile + all phase prompts) |
 | UI | Telegram (aiogram 3.x) · Web tracker (FastAPI + HTMX) |
 | HTTP | httpx async |
 | Storage | SQLite + filesystem |
