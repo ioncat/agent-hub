@@ -1,26 +1,53 @@
 # agent-hub
 
-Personal multi-agent hub for workflow automation.  
-**CV pipeline is the first agent** — more domains planned. The hub orchestrates purpose-built services that were already developed independently; agent-hub connects them into automated pipelines.
+**A multi-agent AI operations platform.** Each agent automates one domain end-to-end; the platform orchestrates independent services into workflows. New agents are added over time — this is a growing platform, not a single tool.
 
-> 🚧 Actively in development
+### Agent roster
+
+| # | Agent | Domain | Status |
+|---|-------|--------|--------|
+| 1 | **CV Agent** | Job applications — analyze fit, decide, tailor CV | 🟢 In production |
+| 2 | — | *Personal notes, knowledge & content classification and management* | ⚪ Upcoming |
+
+> 🚧 **Actively in development.** The platform is expanding — the CV Agent is the first of many.
 
 ---
 
-## Why it exists
+## The Problem
 
-Job applications are expensive — they cost time, energy, and focus. Most people apply hoping for the best. This system does the opposite: **it tells you whether to apply before you invest anything.**
+Job seekers spend hours tailoring CVs **before** knowing if they're even a strong candidate.
 
-- **Deep JD analysis** — goes beyond keywords. Understands what the hiring manager is actually trying to solve, surfaces hidden requirements, flags company/role context risks
-- **Honest fit verdict** — score, key barriers, archetype match. If the fit is weak → the system says don't apply and explains why. No false encouragement.
-- **Tailored CV on demand** — if worth applying, generates a CV that maximally surfaces relevant experience for this specific role, reframes it to match what the JD is really asking for
-- **Saves your time, not just your effort** — the pipeline runs automatically. User only makes go/no-go calls.
+Most tools help you write faster. This system answers two questions, in order:
+
+1. **Should you apply?** — an honest read of the vacancy and your real fit. Weak odds → it tells you to skip.
+2. **How do you win this one?** — if worth it, a CV that puts your strongest, most relevant sides forward.
+
+The leverage is your profile: prepare it once, and the platform turns deep JD analysis into a winning pitch — automatically.
+
+---
+
+## Product Vision
+
+**Agent Hub is a personal AI operations platform** — a home for domain agents that grows over time (see the [agent roster](#agent-roster) above).
+
+**Core idea:** specialized services remain independent, reusable products. Agent Hub orchestrates them into end-to-end workflows — without absorbing them. Adding a new domain means adding an agent, not rebuilding the platform.
+
+---
+
+## What the CV Agent does
+
+For every incoming vacancy, the agent runs a decision-first pipeline:
+
+- **Deep JD analysis** — goes beyond keywords. Understands the pain the employer is actually trying to solve, surfaces hidden requirements, flags company/role context risks
+- **Honest fit verdict** — score, key barriers, archetype match. If the fit is weak → the system says *don't apply* and explains why. No false encouragement, no wasted energy.
+- **Tailored CV on demand** — only if worth applying. Generates a CV that maximally surfaces relevant experience for this specific role and reframes it to answer what the JD is really asking for
+- **Time saved, not just effort saved** — the pipeline runs automatically. The user only makes go/no-go calls.
 
 ---
 
 ## User Journey — CV Agent
 
-New jobs are discovered **automatically** via RSS. The agent notifies via Telegram — user only makes decisions.  
+New jobs are discovered **automatically** via RSS. The agent notifies via Telegram — the user only makes decisions.  
 Manual URL input is an option, not the default.
 
 ```mermaid
@@ -38,7 +65,7 @@ flowchart LR
     U["Manual option\nTelegram URL / JD.md drop"] -.->|fallback| A
 ```
 
-**User's only job:** approve or skip. Everything else runs automatically.
+**The user's only job:** approve or skip. Everything else runs automatically.
 
 ---
 
@@ -64,6 +91,19 @@ flowchart TD
 **3-way verdict:** apply · apply with adaptation · don't apply  
 **Fit Breakdown:** per-requirement ✅/⚠️/❌ table — pet-projects never equal commercial experience  
 **Archetype-aware:** JD signals Founder Proxy vs Executor → different CV framing per vacancy
+
+---
+
+## Product Decisions
+
+| Decision | Alternative | Reason |
+|----------|-------------|--------|
+| **Decision-first pipeline** — analyze fit before generating anything | Generate CV for every vacancy | Effort should follow a go/no-go verdict, not precede it. Don't optimize a document the user shouldn't send. |
+| **RSS-first workflow** — jobs are pushed to the user | Manual vacancy search | Users should *evaluate* opportunities, not spend time *finding* them. |
+| **Telegram as primary UI** | Web app / dedicated client | Zero install, already in the user's pocket, native push + inline approve/skip buttons. The interaction is decisions, not browsing. |
+| **Independent services** | Single monolith application | Each service stays reusable and independently evolvable. The parser, CV engine, and monitor are products in their own right. |
+| **Orchestration over absorption** | Rebuild every capability inside the hub | Reuse existing, battle-tested tools. The hub's value is connecting them, not replacing them. |
+| **Human-in-the-loop on irreversible steps** | Full auto-apply | The user owns the apply/skip and CV-approval calls. Automation removes toil, not judgment. |
 
 ---
 
@@ -117,11 +157,10 @@ flowchart TB
 
 ## Built on existing tools
 
-The agent's value is **orchestration** — it connects three independently built services into a single pipeline. Each service was useful alone; together they enable automation that none could do individually.
+The platform's value is **orchestration** — it connects three independently built services into one pipeline. Each was useful alone; together they enable automation none could do individually.
 
 | Repo | What it brings | Interface |
 |------|----------------|-----------|
 | `knowledge-mirror-parser` | URL → clean Markdown — any job board becomes parseable input | HTTP `POST /parse` |
 | `callback-cv` | Candidate profile · tailored prompts · PDF generation — the CV engine | Filesystem + subprocess |
 | `job-board-monitor` | RSS watcher — turns job boards into a real-time feed | `seen_jobs.json` |
-
