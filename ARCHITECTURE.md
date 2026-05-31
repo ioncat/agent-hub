@@ -407,3 +407,34 @@ See `BACKLOG.md → P2 — Onboarding` for full field list.
 - **callback-cv** remains filesystem + subprocess (no HTTP needed for Phase 1).
 - **Dependency management:** adapter layer + contract tests + version pinning. Update = explicit event (run tests, bump version).
 - **Docker Compose from day 1** — two containers: agent-hub + kmp-service.
+
+**2026-05-31 — Product pivot (major):**
+
+- **Vertical product architecture.** The platform hosts domain verticals (agents). Each vertical is a tight, purpose-built product with a hard-rail pipeline — intentional by design, not a limitation. The CV Agent is the first vertical.
+
+- **ICP = PdM / PO / PM in active job search** (passive as secondary). Platform is PM-domain-specific: prompts, archetype logic, fit dimensions are all PM-aware. Narrow ICP → sharper product.
+
+- **Monorepo consolidation.** All previously external repos (`knowledge-mirror-parser`, `callback-cv`, `job-board-monitor`) move inside agent-hub as `services/`. Rule: nothing user-built lives outside. External APIs/platforms (Claude, Telegram, job boards) stay external by definition.
+  - Before moving each service: **audit it** — remove dead code, unused features, anything that doesn't serve the pipeline. Services become organic components, as if built for this system from day one.
+
+- **callback-cv dissolution.** The repo served three purposes:
+  - `PROFILE.md` (candidate data) → becomes a generated artifact from Onboarding, stored in DB. Not a file to hand-edit.
+  - `cv_to_pdf.py` → extracted into `services/pdf/` as a proper HTTP service (`POST /render`). CVAdapter switches from subprocess to HTTP — tools layer unchanged (adapter pattern pays off).
+  - Prompts (`phase1–4.md`) → already migrated to `agent-hub/prompts/` in previous sessions.
+
+- **job-board-monitor** → extracted into `services/job-monitor/`, redesigned from file-polling to webhook push (`POST /api/new-vacancy`). Eliminates polling loop, becomes event-driven.
+
+- **Onboarding = PDF → Interview → Profile in DB.**
+  1. User uploads `Profile.pdf` (LinkedIn export or richest CV)
+  2. System converts PDF → Markdown (LLM-friendly format)
+  3. System analyzes the profile, generates a **personalized interview** tailored to the candidate
+  4. Conversational interview extracts full depth of experience, projects, PM-specific framing (Delivery/Discovery/both, archetype, gaps)
+  5. Interview transcript → structured `PROFILE` stored in SQLite (per-user)
+  - Multiple interview passes allowed — profile deepens over time
+  - PROFILE.md becomes a generated artifact, not a hand-edited file
+
+- **Multi-user: design now, infrastructure incrementally.**
+  - Design decisions (data model, isolation, onboarding flow) implemented with multi-user in mind from the start — cheap now, expensive to retrofit later.
+  - SaaS infrastructure (auth, billing, per-user RSS workers, web auth) added incrementally as user base grows.
+
+- **Project rename.** "agent-hub" no longer reflects the product identity — it has become a focused vertical service, not a generic hub. Name TBD; tracked in backlog.

@@ -13,6 +13,26 @@
 
 ---
 
+## Hiring is broken. Let's fix it.
+
+Job search has become needlessly hard. Employers bury their real pain inside generic JDs. Candidates fire off generic CVs hoping something lands. Both sides drown in noise.
+
+**Our belief:** a good match is a conversation of relevance. The employer states the problem they need solved. The candidate understands it and responds with their strongest, most relevant evidence.
+
+**Today** the platform serves the candidate side: it reads the employer's real intent out of the JD, judges honest fit, and surfaces the candidate's strongest relevant story — or tells them to walk away.
+
+**North star:** close the loop on both sides, so employers and candidates reach the most relevant offers to each other.
+
+---
+
+## Who it's for
+
+**Product Managers, Product Owners, Project Managers** — in active job search (passive search as secondary).
+
+Built for PMs specifically: fit analysis understands PM archetypes (Delivery vs Discovery, Execution vs Founder Proxy), evaluates PM-specific experience signals, and adapts CV framing to what the role actually needs.
+
+---
+
 ## The Problem
 
 Job seekers spend hours tailoring CVs **before** knowing if they're even a strong candidate.
@@ -22,7 +42,7 @@ Most tools help you write faster. This system answers two questions, in order:
 1. **Should you apply?** — an honest read of the vacancy and your real fit. Weak odds → it tells you to skip.
 2. **How do you win this one?** — if worth it, a CV that puts your strongest, most relevant sides forward.
 
-The leverage is your profile: prepare it once, and the platform turns deep JD analysis into a winning pitch — automatically.
+The leverage is your profile: onboard once, and the platform turns deep JD analysis into a winning pitch — automatically, for every vacancy.
 
 ---
 

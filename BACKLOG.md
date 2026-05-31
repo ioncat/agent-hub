@@ -1,6 +1,47 @@
 # agent-hub — Backlog
 
-> Last updated: 2026-05-30
+> Last updated: 2026-05-31
+> ⚠️ Major pivot 2026-05-31: product is now a focused vertical service for PdM/PO/PM job search.
+> Monorepo consolidation, onboarding redesign, multi-user data model added as top priorities.
+> See ARCHITECTURE.md → Design Decisions Log → 2026-05-31 for full context.
+
+---
+
+## P0 — Foundation (post-pivot)
+
+### 🔴 Monorepo consolidation — service audit + migration
+
+Before copying anything in: **audit each service first** — strip dead code, cut unused features, make it an organic component of this system.
+
+- [ ] **`services/parser/`** — audit `knowledge-mirror-parser`: what does it actually use? What can be removed? Report findings, then migrate only what's needed. Keep HTTP contract (`POST /parse`), KMPAdapter unchanged.
+- [ ] **`services/pdf/`** — extract `cv_to_pdf.py` from callback-cv into a proper FastAPI service (`POST /render`). CVAdapter switches from subprocess → HTTP. No changes in tools layer.
+- [ ] **`services/job-monitor/`** — redesign `job-board-monitor` from file-polling → webhook push (`POST /api/new-vacancy`). RSSWatcher becomes a webhook receiver endpoint.
+- [ ] Remove callback-cv filesystem dependency from settings. Profile is built by onboarding, not hand-edited.
+- [ ] Update `docker-compose.yml` — all services from `services/` subdirectories.
+
+### 🔴 Multi-user data model
+
+Design now — infrastructure incrementally.
+
+- [ ] Add `users` table to `db/schema.sql` — `id`, `telegram_chat_id`, `name`, `created_at`
+- [ ] Add `user_id` FK to `vacancies`, `llm_usage`, `pipeline_runs`
+- [ ] `database.py` — all queries scoped by `user_id`
+- [ ] `AgentDeps` — carries `user_id`, passed to all tools
+- [ ] `Settings` — remove single-user `TELEGRAM_CHAT_ID` assumption (keep as default user for now)
+
+### 🔴 Onboarding — PDF → Interview → Profile
+
+- [ ] **PDF → Markdown**: accept `Profile.pdf` via Telegram, convert to Markdown
+- [ ] **Profile analysis**: LLM reads candidate profile, builds personalized PM-domain interview (Delivery/Discovery framing, archetype, key projects, gaps)
+- [ ] **Conversational interview**: multi-turn Telegram conversation, LLM extracts full depth of experience
+- [ ] **Profile generation**: interview transcript → structured profile stored in SQLite per user
+- [ ] **Multi-pass**: allow re-interview / profile enrichment at any time
+
+### 🟡 Project rename
+
+- [ ] Decide new name — product is a focused PM job-search service, not a generic "hub"
+- [ ] Rename repo, update all references
+- [ ] *(Non-blocking — discuss separately)*
 
 ---
 
@@ -127,6 +168,14 @@ SELECT v.id, v.title, SUM(u.cost_usd) AS cost FROM llm_usage u JOIN vacancies v 
 - [ ] README: Mermaid logical diagram + architecture diagram + state machine diagram
 - [ ] QUICKSTART.md — one-command startup guide
 - [ ] USER_GUIDE.md — Telegram commands + web tracker usage
+- [ ] **Setup / Prerequisites doc** — external repos must be cloned alongside agent-hub:
+  - `callback-cv` (🔴 mandatory) — filesystem path `../callback-cv`; provides PROFILE.md + cv_to_pdf.py
+  - `knowledge-mirror-parser` (🟠 for URL fetch) — HTTP service `KMP_BASE_URL`; docker-compose builds from `../knowledge-mirror-parser`
+  - `job-board-monitor` (🟢 optional) — produces `seen_jobs.json` for auto-discovery; or use `scripts/emit_vacancy.py`
+  - Document the default sibling-folder layout (all repos under one parent dir) + env-var overrides
+- [ ] **Decide multi-repo onboarding strategy** — explicit clone instructions vs bootstrap script vs git submodules.
+  - ⚠️ Constraint: `callback-cv` holds PROFILE.md (personal data) — must NOT become a public submodule.
+  - Likely split: public tools (kmp) via submodule/script; callback-cv stays user-provided private repo.
 
 ---
 
