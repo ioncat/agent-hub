@@ -44,13 +44,13 @@ flowchart TD
     P1 --> P2["Phase 2 — Fit Scoring\nVerdict · Key Barriers · Adaptation Plan · Fit Breakdown"]
     P2 --> QS["Quick Scan → Telegram\nScore / Verdict / Barriers / Warnings"]
 
-    QS -->|"подавать / с адаптацией"| P3["Phase 3 — CV Draft\nhidden from user"]
+    QS -->|"apply / apply with adaptation"| P3["Phase 3 — CV Draft\nhidden from user"]
     P3 --> P35["Phase 3.5 — Self-Review\ncross-checks Adaptation Plan · shown for approval"]
     P35 --> PDF["CV.pdf → Telegram"]
     PDF --> P4["Phase 4 — Cover Letter → Telegram"]
 ```
 
-**3-way verdict:** подавать · подавать с адаптацией · не подавать  
+**3-way verdict:** apply · apply with adaptation · don't apply  
 **Fit Breakdown:** per-requirement ✅/⚠️/❌ table — pet-projects never equal commercial experience  
 **Archetype-aware:** JD signals Founder Proxy vs Executor → different CV framing per vacancy
 
