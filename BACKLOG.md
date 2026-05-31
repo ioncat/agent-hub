@@ -7,6 +7,26 @@
 
 ---
 
+## P0 — Market Research (do before next dev sprint)
+
+### 🔴 Competitive landscape analysis
+
+**Goal:** Understand the market before building further. Are there similar services? What's our real differentiation? Is the positioning defensible?
+
+**Scope:**
+- Find existing services with similar positioning (AI-assisted job search, CV tailoring, fit analysis — especially PM-focused)
+- Analyse their approach: what they do well, what's missing, how they position
+- Critique our strategy, positioning, and product decisions — stress-test them with real market data
+- Verdict: does our positioning make sense, is there a gap, what should we adjust?
+
+**How:** Write a dedicated research prompt using our `docs/discovery/product-thesis.md` + `docs/discovery/ideas.md` + README as context. Run against web search. Produce structured analysis.
+
+**Output:** `docs/discovery/competitive-analysis.md`
+
+⚠️ **Reminder at session start** — this task was explicitly requested on 2026-05-31.
+
+---
+
 ## P0 — Foundation (post-pivot)
 
 ### 🔴 Monorepo consolidation — service audit + migration
