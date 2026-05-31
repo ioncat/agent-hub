@@ -13,7 +13,7 @@
 
 ---
 
-## Hiring is broken. Let's fix it.
+## Hiring is broken. You can fix your side.
 
 Job search has become needlessly hard. Employers bury their real pain inside generic JDs. Candidates fire off generic CVs hoping something lands. Both sides drown in noise.
 
