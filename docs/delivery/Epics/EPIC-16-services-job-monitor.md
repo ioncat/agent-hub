@@ -1,6 +1,6 @@
 # EPIC-16 — services/job-monitor/ — Move + redesign job monitor
 
-**Status:** 📋 Planned
+**Status:** ✅ Done (2026-06-01)
 **Phase:** Phase 4 of PIVOT-PLAN
 **Priority:** P0 — Foundation
 **Last updated:** 2026-06-01
@@ -76,9 +76,9 @@ So that I don't have to manually submit URLs — the system discovers and queues
 
 | # | Task | Status |
 |---|------|--------|
-| 1 | Move `monitor.py` + `feeds.json.example` → `services/job-monitor/` | 📋 |
-| 2 | `services/job-monitor/requirements.txt` + `Dockerfile` | 📋 |
-| 3 | `docker-compose.yml` — add `job-monitor` container | 📋 |
-| 4 | `monitor.py` — replace `send_telegram()` → `POST /api/new-vacancy` | 📋 |
-| 5 | `web/api.py` — `POST /api/new-vacancy` endpoint | 📋 |
-| 6 | `core/rss_watcher.py` — remove file-polling loop | 📋 |
+| 1 | Move `monitor.py` + `feeds.json.example` → `services/job-monitor/` | ✅ Done |
+| 2 | `services/job-monitor/requirements.txt` + `Dockerfile` | ✅ Done |
+| 3 | `docker-compose.yml` — add `job-monitor` container | ✅ Done |
+| 4 | `monitor.py` — replace `send_telegram()` → `POST /api/new-vacancy` | ✅ Done |
+| 5 | `web/api.py` — `POST /api/new-vacancy` endpoint | ✅ Done |
+| 6 | `core/rss_watcher.py` — remove file-polling loop | ✅ Done |
