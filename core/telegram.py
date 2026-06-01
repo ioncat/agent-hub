@@ -49,9 +49,9 @@ from core.onboarding import (
     OnboardingStates,
     get_or_create_user_by_chat_id,
     parse_pdf,
-    synthesise_profile_stub,
 )
 from db import database
+from tools.cv_onboard import build_profile_from_cv
 
 log = logging.getLogger(__name__)
 
@@ -346,13 +346,13 @@ class TelegramBot:
                 skill_type = data.get("skill_type", "pm")
                 user_id = await self._resolve_user_id(message.chat.id)
 
-                # Persist to DB
-                await database.upsert_user(user_id=user_id, name=name, skill_type=skill_type)
-                profile_json = await asyncio.get_event_loop().run_in_executor(
-                    None, synthesise_profile_stub, cv_text, name, skill_type
+                # Persist via cv_onboard tool (stub synthesis; future: LLM interview)
+                await build_profile_from_cv(
+                    user_id=user_id,
+                    name=name,
+                    skill_type=skill_type,
+                    cv_text=cv_text,
                 )
-                await database.update_user_profile(user_id, profile_json)
-                await database.update_user_onboarding_step(user_id, None)
 
                 await state.clear()
 
