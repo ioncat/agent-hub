@@ -137,7 +137,7 @@ async def main() -> None:
     settings.vacancies_path.mkdir(parents=True, exist_ok=True)
 
     kmp_adapter = KMPAdapter(base_url=settings.kmp_base_url)
-    cv_adapter = CVAdapter(callback_cv_path=settings.callback_cv_path)
+    cv_adapter = CVAdapter(pdf_service_url=settings.pdf_service_url)
     deps = AgentDeps(
         kmp_adapter=kmp_adapter,
         llm=llm,

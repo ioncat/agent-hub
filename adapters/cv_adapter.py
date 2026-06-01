@@ -1,60 +1,44 @@
 """
-adapters/cv_adapter.py — CVAdapter: subprocess wrapper for callback-cv tools.
+adapters/cv_adapter.py — CVAdapter: HTTP client for services/pdf/.
 
-Wraps `cv_to_pdf.py` from the callback-cv repo.
-Uses the callback-cv virtualenv Python when available; falls back to sys.executable.
+Replaces the previous subprocess wrapper for callback-cv/cv_to_pdf.py.
+Sends markdown text to the pdf-service POST /render endpoint and
+writes returned PDF bytes to disk.
 
 Usage:
-    adapter = CVAdapter(callback_cv_path=Path("../callback-cv"))
-    pdf_path = await adapter.generate_pdf(Path("vacancies/djinni/2026-05/job/Name_CV.md"))
+    adapter = CVAdapter(pdf_service_url="http://localhost:8002")
+    pdf_path = await adapter.generate_pdf(Path("vacancies/1/job/Name_CV.md"))
 """
 
-import asyncio
 import logging
-import sys
 from pathlib import Path
+
+import httpx
 
 log = logging.getLogger(__name__)
 
+_DEFAULT_TIMEOUT = 60.0  # seconds — PDF rendering can be slow for large CVs
+
 
 class CVAdapterError(Exception):
-    """Raised when cv_to_pdf subprocess fails."""
+    """Raised when the pdf-service returns an error or is unreachable."""
 
 
 class CVAdapter:
-    """Async wrapper for cv_to_pdf.py subprocess.
+    """Async HTTP client for the career-agent PDF render service.
 
     Args:
-        callback_cv_path: Path to the callback-cv repo root.
+        pdf_service_url: Base URL of the pdf-service (default: http://localhost:8002).
     """
 
-    def __init__(self, callback_cv_path: Path) -> None:
-        self._cv_path = Path(callback_cv_path)
-        self._script = self._cv_path / "cv_to_pdf.py"
-        self._python = self._resolve_python()
-
-    def _resolve_python(self) -> str:
-        """Find the Python executable to use for cv_to_pdf.py.
-
-        Prefer callback-cv venv (has fpdf); fall back to current interpreter.
-        """
-        win = self._cv_path / "venv" / "Scripts" / "python.exe"
-        unix = self._cv_path / "venv" / "bin" / "python"
-        if win.exists():
-            return str(win)
-        if unix.exists():
-            return str(unix)
-        log.warning(
-            "CVAdapter: venv not found at %s — using %s (fpdf may be missing)",
-            self._cv_path / "venv",
-            sys.executable,
-        )
-        return sys.executable
+    def __init__(self, pdf_service_url: str = "http://localhost:8002") -> None:
+        self._url = pdf_service_url.rstrip("/")
 
     async def generate_pdf(self, md_path: Path, pdf_path: Path | None = None) -> Path:
-        """Generate PDF from a CV markdown file.
+        """Generate PDF from a CV markdown file via the pdf-service.
 
-        Runs: `python cv_to_pdf.py <md_path> <pdf_path>`
+        Reads markdown from md_path, POSTs to /render, writes response
+        bytes to pdf_path.
 
         Args:
             md_path:  Path to the input CV markdown file.
@@ -64,43 +48,44 @@ class CVAdapter:
             Path to the generated PDF file.
 
         Raises:
-            CVAdapterError: Subprocess failed or PDF not created.
-            FileNotFoundError: cv_to_pdf.py script not found.
+            CVAdapterError: Service returned an error or is unreachable.
+            FileNotFoundError: md_path does not exist.
         """
         md_path = Path(md_path)
+        if not md_path.exists():
+            raise FileNotFoundError(f"Markdown file not found: {md_path}")
+
         if pdf_path is None:
             pdf_path = md_path.with_suffix(".pdf")
 
-        if not self._script.exists():
-            raise FileNotFoundError(f"cv_to_pdf.py not found at {self._script}")
-
-        log.info("CVAdapter: generating PDF %s → %s", md_path, pdf_path)
+        markdown_text = md_path.read_text(encoding="utf-8")
+        render_url = f"{self._url}/render"
+        log.info("CVAdapter: POST %s → %s", render_url, pdf_path)
 
         try:
-            proc = await asyncio.create_subprocess_exec(
-                self._python,
-                str(self._script),
-                str(md_path),
-                str(pdf_path),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
-        except asyncio.TimeoutError as exc:
-            raise CVAdapterError("cv_to_pdf.py timed out after 30s") from exc
-        except OSError as exc:
-            raise CVAdapterError(f"Failed to start subprocess: {exc}") from exc
-
-        if proc.returncode != 0:
-            err = stderr.decode("utf-8", errors="replace").strip()
+            async with httpx.AsyncClient(timeout=_DEFAULT_TIMEOUT) as client:
+                response = await client.post(
+                    render_url,
+                    json={"markdown": markdown_text},
+                )
+        except httpx.ConnectError as exc:
             raise CVAdapterError(
-                f"cv_to_pdf.py exited {proc.returncode}: {err}"
-            )
-
-        if not pdf_path.exists():
+                f"pdf-service unreachable at {self._url}: {exc}"
+            ) from exc
+        except httpx.TimeoutException as exc:
             raise CVAdapterError(
-                f"cv_to_pdf.py exited 0 but PDF not found at {pdf_path}"
+                f"pdf-service timed out after {_DEFAULT_TIMEOUT}s"
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise CVAdapterError(f"HTTP error calling pdf-service: {exc}") from exc
+
+        if response.status_code != 200:
+            body = response.text[:300]
+            raise CVAdapterError(
+                f"pdf-service returned {response.status_code}: {body}"
             )
 
-        log.info("CVAdapter: PDF generated → %s", pdf_path)
+        pdf_path = Path(pdf_path)
+        pdf_path.write_bytes(response.content)
+        log.info("CVAdapter: PDF written → %s (%d bytes)", pdf_path, len(response.content))
         return pdf_path

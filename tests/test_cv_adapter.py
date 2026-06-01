@@ -1,15 +1,14 @@
 """
-tests/test_cv_adapter.py — Contract tests for CVAdapter.
+tests/test_cv_adapter.py — Contract tests for CVAdapter (HTTP version).
 
-Mocks asyncio.create_subprocess_exec — no real subprocess needed.
-Verifies: python resolution, PDF generation, all error paths.
+Mocks httpx.AsyncClient — no real pdf-service needed.
+Verifies: happy path, error paths (4xx/5xx, connect error, timeout).
 """
 
-import asyncio
-import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from adapters.cv_adapter import CVAdapter, CVAdapterError
@@ -17,50 +16,26 @@ from adapters.cv_adapter import CVAdapter, CVAdapterError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _adapter(tmp_path: Path, *, create_script: bool = True, create_venv_win: bool = False) -> CVAdapter:
-    """Build CVAdapter with tmp_path as callback_cv_path."""
-    if create_script:
-        (tmp_path / "cv_to_pdf.py").write_text("# stub", encoding="utf-8")
-    if create_venv_win:
-        scripts = tmp_path / "venv" / "Scripts"
-        scripts.mkdir(parents=True)
-        (scripts / "python.exe").write_text("", encoding="utf-8")
-    return CVAdapter(callback_cv_path=tmp_path)
+def _adapter(url: str = "http://localhost:8002") -> CVAdapter:
+    return CVAdapter(pdf_service_url=url)
 
 
-def _mock_proc(returncode: int = 0, stdout: bytes = b"", stderr: bytes = b"") -> AsyncMock:
-    proc = AsyncMock()
-    proc.returncode = returncode
-    proc.communicate.return_value = (stdout, stderr)
-    return proc
+def _mock_response(status_code: int = 200, content: bytes = b"%PDF-1.4") -> MagicMock:
+    resp = MagicMock()
+    resp.status_code = status_code
+    resp.content = content
+    resp.text = content.decode("utf-8", errors="replace")
+    return resp
 
 
-# ── _resolve_python ───────────────────────────────────────────────────────────
-
-def test_resolve_python_uses_win_venv(tmp_path):
-    scripts = tmp_path / "venv" / "Scripts"
-    scripts.mkdir(parents=True)
-    win_python = scripts / "python.exe"
-    win_python.write_text("", encoding="utf-8")
-    (tmp_path / "cv_to_pdf.py").write_text("", encoding="utf-8")
-    adapter = CVAdapter(callback_cv_path=tmp_path)
-    assert adapter._python == str(win_python)
-
-
-def test_resolve_python_uses_unix_venv(tmp_path):
-    bin_dir = tmp_path / "venv" / "bin"
-    bin_dir.mkdir(parents=True)
-    unix_python = bin_dir / "python"
-    unix_python.write_text("", encoding="utf-8")
-    (tmp_path / "cv_to_pdf.py").write_text("", encoding="utf-8")
-    adapter = CVAdapter(callback_cv_path=tmp_path)
-    assert adapter._python == str(unix_python)
-
-
-def test_resolve_python_falls_back_to_sys_executable(tmp_path):
-    (tmp_path / "cv_to_pdf.py").write_text("", encoding="utf-8")
-    adapter = CVAdapter(callback_cv_path=tmp_path)
-    assert adapter._python == sys.executable
+def _mock_client(response: MagicMock) -> MagicMock:
+    """Build a mock httpx.AsyncClient context manager returning the given response."""
+    client = AsyncMock()
+    client.post = AsyncMock(return_value=response)
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=client)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+    return ctx
 
 
 # ── generate_pdf — happy path ─────────────────────────────────────────────────
@@ -68,14 +43,16 @@ def test_resolve_python_falls_back_to_sys_executable(tmp_path):
 @pytest.mark.asyncio
 async def test_generate_pdf_returns_pdf_path(tmp_path):
     md = tmp_path / "CV.md"
-    md.write_text("# CV", encoding="utf-8")
+    md.write_text("# CV\nContent.", encoding="utf-8")
     pdf = tmp_path / "CV.pdf"
-    pdf.write_bytes(b"%PDF-1.4")  # create so adapter finds it
 
-    proc = _mock_proc(returncode=0)
-    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=proc)):
-        result = await _adapter(tmp_path).generate_pdf(md, pdf)
+    ctx = _mock_client(_mock_response(200, b"%PDF-1.4 bytes"))
+    with patch("adapters.cv_adapter.httpx.AsyncClient", return_value=ctx):
+        result = await _adapter().generate_pdf(md, pdf)
+
     assert result == pdf
+    assert pdf.exists()
+    assert pdf.read_bytes() == b"%PDF-1.4 bytes"
 
 
 @pytest.mark.asyncio
@@ -83,98 +60,95 @@ async def test_generate_pdf_default_output_path(tmp_path):
     """When pdf_path=None, output defaults to md_path.with_suffix('.pdf')."""
     md = tmp_path / "Name_CV.md"
     md.write_text("# CV", encoding="utf-8")
-    expected_pdf = tmp_path / "Name_CV.pdf"
-    expected_pdf.write_bytes(b"%PDF")
 
-    proc = _mock_proc(returncode=0)
-    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=proc)):
-        result = await _adapter(tmp_path).generate_pdf(md)
-    assert result == expected_pdf
+    ctx = _mock_client(_mock_response(200, b"%PDF"))
+    with patch("adapters.cv_adapter.httpx.AsyncClient", return_value=ctx):
+        result = await _adapter().generate_pdf(md)
+
+    assert result == tmp_path / "Name_CV.pdf"
+    assert result.exists()
 
 
 @pytest.mark.asyncio
-async def test_generate_pdf_calls_correct_args(tmp_path):
+async def test_generate_pdf_posts_markdown_text(tmp_path):
+    """CVAdapter reads md_path and sends its text as markdown field."""
     md = tmp_path / "CV.md"
-    md.write_text("# CV", encoding="utf-8")
-    pdf = tmp_path / "CV.pdf"
-    pdf.write_bytes(b"%PDF")
+    md.write_text("# My CV\nGreat experience.", encoding="utf-8")
 
-    proc = _mock_proc(returncode=0)
-    mock_exec = AsyncMock(return_value=proc)
-    with patch("asyncio.create_subprocess_exec", mock_exec):
-        adapter = _adapter(tmp_path)
-        await adapter.generate_pdf(md, pdf)
+    mock_resp = _mock_response(200, b"%PDF")
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_resp)
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=mock_client)
+    ctx.__aexit__ = AsyncMock(return_value=False)
 
-    call_args = mock_exec.call_args[0]
-    assert call_args[0] == adapter._python
-    assert str(adapter._script) in call_args
-    assert str(md) in call_args
-    assert str(pdf) in call_args
+    with patch("adapters.cv_adapter.httpx.AsyncClient", return_value=ctx):
+        await _adapter().generate_pdf(md)
+
+    mock_client.post.assert_awaited_once()
+    call_kwargs = mock_client.post.call_args.kwargs
+    assert call_kwargs["json"]["markdown"] == "# My CV\nGreat experience."
 
 
 # ── generate_pdf — error paths ────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_generate_pdf_script_not_found_raises(tmp_path):
-    adapter = CVAdapter(callback_cv_path=tmp_path)  # no cv_to_pdf.py
-    md = tmp_path / "CV.md"
-    md.write_text("# CV", encoding="utf-8")
-    with pytest.raises(FileNotFoundError, match="cv_to_pdf.py not found"):
+async def test_generate_pdf_md_not_found_raises(tmp_path):
+    adapter = _adapter()
+    md = tmp_path / "nonexistent.md"
+    with pytest.raises(FileNotFoundError, match="Markdown file not found"):
         await adapter.generate_pdf(md)
 
 
 @pytest.mark.asyncio
-async def test_generate_pdf_nonzero_exit_raises(tmp_path):
+async def test_generate_pdf_service_500_raises(tmp_path):
     md = tmp_path / "CV.md"
     md.write_text("# CV", encoding="utf-8")
-    proc = _mock_proc(returncode=1, stderr=b"SyntaxError: invalid syntax")
-    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=proc)):
-        with pytest.raises(CVAdapterError, match="exited 1"):
-            await _adapter(tmp_path).generate_pdf(md)
+
+    ctx = _mock_client(_mock_response(500, b"Internal Server Error"))
+    with patch("adapters.cv_adapter.httpx.AsyncClient", return_value=ctx):
+        with pytest.raises(CVAdapterError, match="500"):
+            await _adapter().generate_pdf(md)
 
 
 @pytest.mark.asyncio
-async def test_generate_pdf_stderr_included_in_error(tmp_path):
+async def test_generate_pdf_service_422_raises(tmp_path):
+    md = tmp_path / "CV.md"
+    md.write_text("   ", encoding="utf-8")  # whitespace-only
+
+    ctx = _mock_client(_mock_response(422, b'{"detail":"markdown field is empty"}'))
+    with patch("adapters.cv_adapter.httpx.AsyncClient", return_value=ctx):
+        with pytest.raises(CVAdapterError, match="422"):
+            await _adapter().generate_pdf(md)
+
+
+@pytest.mark.asyncio
+async def test_generate_pdf_connect_error_raises(tmp_path):
     md = tmp_path / "CV.md"
     md.write_text("# CV", encoding="utf-8")
-    proc = _mock_proc(returncode=2, stderr=b"ImportError: No module named fpdf")
-    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=proc)):
-        with pytest.raises(CVAdapterError) as exc_info:
-            await _adapter(tmp_path).generate_pdf(md)
-    assert "fpdf" in str(exc_info.value)
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=mock_client)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("adapters.cv_adapter.httpx.AsyncClient", return_value=ctx):
+        with pytest.raises(CVAdapterError, match="unreachable"):
+            await _adapter().generate_pdf(md)
 
 
 @pytest.mark.asyncio
 async def test_generate_pdf_timeout_raises(tmp_path):
     md = tmp_path / "CV.md"
     md.write_text("# CV", encoding="utf-8")
-    proc = AsyncMock()
-    proc.communicate.side_effect = asyncio.TimeoutError()
-    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=proc)):
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=mock_client)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("adapters.cv_adapter.httpx.AsyncClient", return_value=ctx):
         with pytest.raises(CVAdapterError, match="timed out"):
-            await _adapter(tmp_path).generate_pdf(md)
-
-
-@pytest.mark.asyncio
-async def test_generate_pdf_oserror_raises(tmp_path):
-    md = tmp_path / "CV.md"
-    md.write_text("# CV", encoding="utf-8")
-    with patch(
-        "asyncio.create_subprocess_exec",
-        AsyncMock(side_effect=OSError("python not found")),
-    ):
-        with pytest.raises(CVAdapterError, match="Failed to start"):
-            await _adapter(tmp_path).generate_pdf(md)
-
-
-@pytest.mark.asyncio
-async def test_generate_pdf_exit_0_but_no_pdf_raises(tmp_path):
-    """Subprocess exits 0 but PDF file was not created."""
-    md = tmp_path / "CV.md"
-    md.write_text("# CV", encoding="utf-8")
-    pdf = tmp_path / "CV.pdf"
-    # pdf intentionally NOT created
-    proc = _mock_proc(returncode=0)
-    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=proc)):
-        with pytest.raises(CVAdapterError, match="PDF not found"):
-            await _adapter(tmp_path).generate_pdf(md, pdf)
+            await _adapter().generate_pdf(md)

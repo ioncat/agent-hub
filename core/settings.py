@@ -3,7 +3,7 @@ core/settings.py — application config loaded from env vars.
 
 Required vars: ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 Optional vars (have defaults): LLM_MODEL, PROFILE_MD_PATH, DB_PATH, KMP_BASE_URL,
-                               CANDIDATE_NAME, CALLBACK_CV_PATH
+                               CANDIDATE_NAME, PDF_SERVICE_URL
 
 Fails fast on startup if required vars are missing — never starts in broken state.
 
@@ -36,10 +36,10 @@ class Settings:
     profile_md_path: Path = field(default_factory=lambda: Path("../callback-cv/skill/PROFILE.md"))
     db_path: Path = field(default_factory=lambda: Path("db/agent.db"))
     kmp_base_url: str = "http://localhost:8001"
+    pdf_service_url: str = "http://localhost:8002"
     vacancies_path: Path = field(default_factory=lambda: Path("vacancies"))
     max_tokens: int = 4096
     candidate_name: str = "Candidate"
-    callback_cv_path: Path = field(default_factory=lambda: Path("../callback-cv"))
     seen_jobs_path: Path = field(default_factory=lambda: Path("seen_jobs.json"))
     rss_poll_interval: int = 60  # seconds between seen_jobs.json polls
     agent_mode: str = "production"  # "testing" → confirm before each LLM API call
@@ -88,10 +88,10 @@ def load_settings() -> Settings:
         )),
         db_path=Path(_optional("DB_PATH", "db/agent.db")),
         kmp_base_url=_optional("KMP_BASE_URL", "http://localhost:8001"),
+        pdf_service_url=_optional("PDF_SERVICE_URL", "http://localhost:8002"),
         vacancies_path=Path(_optional("VACANCIES_PATH", "vacancies")),
         max_tokens=int(_optional("MAX_TOKENS", "4096")),
         candidate_name=_optional("CANDIDATE_NAME", "Candidate"),
-        callback_cv_path=Path(_optional("CALLBACK_CV_PATH", "../callback-cv")),
         seen_jobs_path=Path(_optional("SEEN_JOBS_PATH", "seen_jobs.json")),
         rss_poll_interval=int(_optional("RSS_POLL_INTERVAL", "60")),
         agent_mode=_optional("AGENT_MODE", "production"),

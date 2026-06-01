@@ -363,34 +363,3 @@ async def test_generate_phase35_llm_error(tmp_path):
     # [Name]_CV.md must NOT be written
     assert not (jd_path.parent / "Oleksii_Bondarenko_CV.md").exists()
 
-
-# ── CVAdapter ─────────────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_cv_adapter_script_not_found(tmp_path):
-    adapter = CVAdapter(callback_cv_path=tmp_path / "nonexistent")
-    md_path = tmp_path / "CV.md"
-    md_path.write_text("# Test", encoding="utf-8")
-
-    with pytest.raises(FileNotFoundError, match="cv_to_pdf.py not found"):
-        await adapter.generate_pdf(md_path)
-
-
-@pytest.mark.asyncio
-async def test_cv_adapter_subprocess_failure(tmp_path):
-    """Subprocess exit code != 0 raises CVAdapterError."""
-    # Create a fake cv_to_pdf.py that always fails
-    fake_cv_path = tmp_path / "fake-callback-cv"
-    fake_cv_path.mkdir()
-    script = fake_cv_path / "cv_to_pdf.py"
-    script.write_text("import sys; sys.exit(1)", encoding="utf-8")
-
-    adapter = CVAdapter(callback_cv_path=fake_cv_path)
-    md_path = tmp_path / "CV.md"
-    md_path.write_text("# Test CV", encoding="utf-8")
-
-    import sys
-    adapter._python = sys.executable  # use current python to run the fake script
-
-    with pytest.raises(CVAdapterError, match="exited 1"):
-        await adapter.generate_pdf(md_path)

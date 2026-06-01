@@ -1,5 +1,22 @@
 services:
 
+  # ── pdf-service — Markdown → PDF renderer ─────────────────────────────────
+  pdf-service:
+    build:
+      context: ./services/pdf
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./fonts:/app/fonts:ro              # Segoe UI / Calibri fonts (gitignored, host-provided)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
   # ── knowledge-mirror-parser — URL → Markdown ───────────────────────────────
   kmp-service:
     build:
@@ -24,15 +41,16 @@ services:
       - .env
     environment:
       KMP_BASE_URL: http://kmp-service:8001
+      PDF_SERVICE_URL: http://pdf-service:8002
       DB_PATH: /app/db/agent.db
       VACANCIES_PATH: /app/vacancies
-      CALLBACK_CV_PATH: /app/callback-cv
     volumes:
       - ./db:/app/db                        # SQLite DB — persisted on host
       - ./vacancies:/app/vacancies          # vacancy folders — persisted on host
-      - ../callback-cv:/app/callback-cv:ro  # PROFILE.md + cv_to_pdf.py (read-only, until Phase 2)
     depends_on:
       kmp-service:
+        condition: service_healthy
+      pdf-service:
         condition: service_healthy
     restart: unless-stopped
 
@@ -49,11 +67,9 @@ services:
     environment:
       DB_PATH: /app/db/agent.db
       VACANCIES_PATH: /app/vacancies
-      CALLBACK_CV_PATH: /app/callback-cv
     volumes:
       - ./db:/app/db:ro                     # read-only — tracker never writes
       - ./vacancies:/app/vacancies:ro
-      - ../callback-cv:/app/callback-cv:ro
     depends_on:
       - career-agent
     restart: unless-stopped
