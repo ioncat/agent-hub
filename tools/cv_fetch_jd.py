@@ -47,14 +47,15 @@ async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
 
     # ── Duplicate check ───────────────────────────────────────────────────────
     existing = await database.get_vacancy_by_url(url)
-    if existing:
-        log.info("cv_fetch_jd: vacancy already in DB id=%d", existing["id"])
+    if existing and existing["status"] != "queued":
+        log.info("cv_fetch_jd: vacancy already in DB id=%d status=%s", existing["id"], existing["status"])
         return (
             f"ℹ️ Вакансия уже в базе.\n"
             f"<b>{existing['title'] or 'Без названия'}</b>\n"
             f"Путь: <code>{existing['markdown_path']}</code>\n"
             f"Статус: {existing['status']}"
         )
+    # status='queued' → webhook pre-created the record; continue to fetch and fill it
 
     # ── Fetch via kmp-service ─────────────────────────────────────────────────
     t0 = time.monotonic()
@@ -83,21 +84,32 @@ async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
     )
     log.info("cv_fetch_jd: saved JD.md → %s", jd_path)
 
-    # ── Insert into DB ────────────────────────────────────────────────────────
+    # ── Insert or update DB record ────────────────────────────────────────────
     markdown_path = str(jd_path)
-    try:
-        vacancy_id = await database.insert_vacancy(
-            url=url,
+    if existing and existing["status"] == "queued":
+        # Webhook pre-created the vacancy — update fields, then mark fetched
+        vacancy_id = existing["id"]
+        await database.update_vacancy_fields(
+            vacancy_id,
             title=doc.title,
             site=site,
             markdown_path=markdown_path,
-            user_id=ctx.deps.user_id,
         )
-    except Exception as exc:
-        # Concurrent insert race — fetch existing
-        log.warning("cv_fetch_jd: insert failed (%s), fetching existing", exc)
-        existing = await database.get_vacancy_by_url(url)
-        vacancy_id = existing["id"] if existing else None
+        log.info("cv_fetch_jd: updated queued vacancy_id=%d", vacancy_id)
+    else:
+        try:
+            vacancy_id = await database.insert_vacancy(
+                url=url,
+                title=doc.title,
+                site=site,
+                markdown_path=markdown_path,
+                user_id=ctx.deps.user_id,
+            )
+        except Exception as exc:
+            # Concurrent insert race — fetch existing
+            log.warning("cv_fetch_jd: insert failed (%s), fetching existing", exc)
+            existing = await database.get_vacancy_by_url(url)
+            vacancy_id = existing["id"] if existing else None
 
     log.info("cv_fetch_jd: vacancy_id=%s title=%r", vacancy_id, doc.title)
 

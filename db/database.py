@@ -159,22 +159,65 @@ async def insert_vacancy(
     site: str | None = None,
     markdown_path: str | None = None,
     user_id: int | None = None,
+    status: str | None = None,
 ) -> int:
     """Insert new vacancy. Returns new row id.
 
     user_id: optional FK to users table. NULL = legacy/unscoped (treated as user_id=1).
+    status: if provided, sets initial status (e.g. 'queued' for webhook-created vacancies).
     Raises sqlite3.IntegrityError if URL already exists — caller should handle.
     """
     async with get_db() as db:
-        cursor = await db.execute(
-            """
-            INSERT INTO vacancies (url, title, site, markdown_path, user_id)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (url, title, site, markdown_path, user_id),
-        )
+        if status is not None:
+            cursor = await db.execute(
+                """
+                INSERT INTO vacancies (url, title, site, markdown_path, user_id, status)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (url, title, site, markdown_path, user_id, status),
+            )
+        else:
+            cursor = await db.execute(
+                """
+                INSERT INTO vacancies (url, title, site, markdown_path, user_id)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (url, title, site, markdown_path, user_id),
+            )
         await db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
+
+
+async def update_vacancy_fields(
+    vacancy_id: int,
+    title: str | None = None,
+    site: str | None = None,
+    markdown_path: str | None = None,
+) -> None:
+    """Update mutable fields of an existing vacancy (e.g. after fetching a queued record).
+
+    Only non-None arguments are updated. Does not touch status or timestamps.
+    """
+    sets: list[str] = []
+    params: list = []
+    if title is not None:
+        sets.append("title = ?")
+        params.append(title)
+    if site is not None:
+        sets.append("site = ?")
+        params.append(site)
+    if markdown_path is not None:
+        sets.append("markdown_path = ?")
+        params.append(markdown_path)
+    if not sets:
+        return
+    params.append(vacancy_id)
+    async with get_db() as db:
+        await db.execute(
+            f"UPDATE vacancies SET {', '.join(sets)} WHERE id = ?",
+            params,
+        )
+        await db.commit()
 
 
 async def get_vacancy_by_url(url: str) -> aiosqlite.Row | None:

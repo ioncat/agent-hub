@@ -8,9 +8,6 @@
   "retry": {
     "backoff_schedule_seconds": [60, 300, 1800, 7200]
   },
-  "telegram": {
-    "disable_web_page_preview": false
-  },
   "logging": {
     "level": "INFO",
     "max_bytes": 10485760,

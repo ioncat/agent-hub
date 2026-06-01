@@ -38,9 +38,10 @@ services:
       context: ./services/job-monitor
       dockerfile: Dockerfile
     env_file:
-      - .env
+      - .env                                       # CAREER_AGENT_USER_1=1 etc.
     environment:
       DATA_DIR: /app/data
+      CAREER_AGENT_URL: http://web-tracker:8080    # POST /api/new-vacancy
     volumes:
       - ./services/job-monitor/data:/app/data      # seen_jobs.json, monitor.log, lock
       - ./services/job-monitor/feeds.json:/app/feeds.json:ro   # !! create from feeds.example.json

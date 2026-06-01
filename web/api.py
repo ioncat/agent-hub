@@ -14,6 +14,7 @@ import markdown as md_lib
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
 try:
     from dotenv import load_dotenv
@@ -81,6 +82,38 @@ async def api_vacancies(
 async def api_users():
     rows = await database.list_users()
     return [dict(row) for row in rows]
+
+
+class NewVacancyRequest(BaseModel):
+    url: str
+    title: str | None = None
+    feed_name: str | None = None
+    user_id: int | None = None
+
+
+@app.post("/api/new-vacancy", status_code=201)
+async def api_new_vacancy(req: NewVacancyRequest):
+    """Webhook endpoint for job-monitor: queue a new vacancy for fetching.
+
+    Returns 201 on success, 409 if URL already exists in DB.
+    career-agent's RSSWatcher polls for status='queued' and triggers cv_fetch_jd.
+    """
+    existing = await database.get_vacancy_by_url(req.url)
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="duplicate")
+    try:
+        vacancy_id = await database.insert_vacancy(
+            url=req.url,
+            title=req.title,
+            user_id=req.user_id,
+            status="queued",
+        )
+    except Exception as exc:
+        if "UNIQUE" in str(exc).upper():
+            raise HTTPException(status_code=409, detail="duplicate")
+        raise
+    log.info("api/new-vacancy: queued vacancy_id=%d url=%s", vacancy_id, req.url)
+    return {"vacancy_id": vacancy_id, "status": "queued"}
 
 
 @app.get("/api/vacancies/{vacancy_id}")

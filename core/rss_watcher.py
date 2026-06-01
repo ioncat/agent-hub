@@ -1,32 +1,23 @@
 """
-core/rss_watcher.py — Background RSS watcher: polls seen_jobs.json, triggers cv_fetch_jd.
+core/rss_watcher.py — Background watcher: polls DB for queued vacancies, triggers cv_fetch_jd.
 
-Simulates the RSS channel from job-board-monitor. When a new URL appears in
-seen_jobs.json, fetches the vacancy and sends the result to Telegram.
+New vacancies arrive via POST /api/new-vacancy (from job-monitor service) which
+inserts them into the DB with status='queued'. This watcher picks them up and
+runs the fetch+parse pipeline.
 
-seen_jobs.json format (produced by job-board-monitor or scripts/emit_vacancy.py):
-    [
-        {
-            "url": "https://djinni.co/jobs/123/",
-            "title": "Backend Developer",
-            "seen_at": "2026-05-29T17:00:00"
-        },
-        ...
-    ]
+Replaces the old file-polling approach (seen_jobs.json) with DB-based event delivery.
 
 Lifecycle (in agent.py):
-    watcher = RSSWatcher(settings.seen_jobs_path, deps, bot, settings.rss_poll_interval)
-    await watcher.start()   # seeds known URLs from DB, starts polling task
+    watcher = RSSWatcher(deps, bot, poll_interval=30)
+    await watcher.start()
     # ... bot runs ...
-    await watcher.stop()    # graceful cancel
+    await watcher.stop()
 """
 
 import asyncio
-import json
 import logging
 from contextlib import suppress
 from dataclasses import dataclass
-from pathlib import Path
 
 from core.deps import AgentDeps
 from db import database
@@ -41,35 +32,30 @@ class _Ctx:
 
 
 class RSSWatcher:
-    """Polls seen_jobs.json and triggers cv_fetch_jd for each new URL.
+    """Polls DB for status='queued' vacancies and triggers cv_fetch_jd for each.
 
-    Runs as a background asyncio.Task. Known URLs are seeded from the DB on
-    startup so already-processed vacancies are never re-fetched after a restart.
+    Runs as a background asyncio.Task. Vacancies are inserted by the
+    POST /api/new-vacancy endpoint (job-monitor webhook).
     """
 
     def __init__(
         self,
-        seen_jobs_path: Path,
         deps: AgentDeps,
         telegram_bot: object,   # TelegramBot — avoids circular import
-        poll_interval: int = 60,
+        poll_interval: int = 30,
     ) -> None:
-        self._path = Path(seen_jobs_path)
         self._deps = deps
         self._bot = telegram_bot
         self._interval = poll_interval
-        self._seen_urls: set[str] = set()
         self._task: asyncio.Task | None = None
 
     async def start(self) -> None:
-        """Seed known URLs from DB, then launch background polling task."""
-        existing = await database.list_vacancies(limit=10_000)
-        self._seen_urls = {row["url"] for row in existing}
-        log.info(
-            "RSSWatcher: seeded %d known URLs — polling %s every %ds",
-            len(self._seen_urls), self._path, self._interval,
-        )
+        """Launch background polling task."""
         self._task = asyncio.create_task(self._run(), name="rss-watcher")
+        log.info(
+            "RSSWatcher: started — polling DB for queued vacancies every %ds",
+            self._interval,
+        )
 
     async def stop(self) -> None:
         """Cancel the polling task and wait for it to exit cleanly."""
@@ -90,30 +76,30 @@ class RSSWatcher:
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                # Never let the loop die on unexpected errors
                 log.error("RSSWatcher: unexpected error in poll loop: %s", exc)
 
     async def _poll_once(self) -> None:
-        """Read seen_jobs.json and process any URLs not yet in the known set."""
-        entries = _read_seen_jobs(self._path)
-        new_entries = [e for e in entries if e.get("url") not in self._seen_urls]
-
-        if not new_entries:
+        """Query DB for queued vacancies and process each."""
+        rows = await database.list_vacancies(
+            status="queued",
+            user_id=self._deps.user_id,
+        )
+        if not rows:
             return
 
-        log.info("RSSWatcher: %d new vacancies detected in %s", len(new_entries), self._path)
-        for entry in new_entries:
-            url = entry.get("url", "").strip()
-            if not url:
-                continue
-            self._seen_urls.add(url)
+        log.info("RSSWatcher: %d queued vacancy(s) found", len(rows))
+        for row in rows:
+            url = row["url"]
+            vacancy_id = row["id"]
+            # Claim the vacancy immediately to avoid double-processing
+            await database.update_vacancy_status(vacancy_id, "fetching")
             await self._process(url)
 
     async def _process(self, url: str) -> None:
         """Fetch one vacancy and send the result to Telegram."""
         from tools.cv_fetch_jd import cv_fetch_jd  # local import to avoid circular
 
-        log.info("RSSWatcher: fetching new vacancy — %s", url)
+        log.info("RSSWatcher: fetching vacancy — %s", url)
         ctx = _Ctx(deps=self._deps)
         try:
             result = await cv_fetch_jd(ctx, url)  # type: ignore[arg-type]
@@ -126,24 +112,3 @@ class RSSWatcher:
                 f"⚠️ <b>RSS: ошибка при обработке вакансии</b>\n\n"
                 f"URL: <code>{url}</code>\nОшибка: {exc}"
             )
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _read_seen_jobs(path: Path) -> list[dict]:
-    """Read seen_jobs.json and return its entries.
-
-    Returns [] on any error (file missing, invalid JSON, wrong type).
-    Never raises — the watcher must never crash on a bad file.
-    """
-    if not path.exists():
-        return []
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(data, list):
-            return data
-        log.warning("RSSWatcher: %s is not a JSON list — skipping", path)
-        return []
-    except (json.JSONDecodeError, OSError) as exc:
-        log.error("RSSWatcher: failed to read %s: %s", path, exc)
-        return []

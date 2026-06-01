@@ -251,3 +251,57 @@ async def test_fetch_jd_passes_user_id_to_db(tmp_path):
 
     call_kwargs = mock_db.insert_vacancy.call_args.kwargs
     assert call_kwargs["user_id"] == 42
+
+
+# ── cv_fetch_jd — queued status (webhook pre-created) ────────────────────────
+
+@pytest.mark.asyncio
+async def test_fetch_jd_processes_queued_vacancy(tmp_path):
+    """When existing vacancy has status='queued', proceed with fetch and update fields."""
+    doc = _make_doc(title="Queued PM Role")
+    kmp = AsyncMock()
+    kmp.fetch_markdown = AsyncMock(return_value=doc)
+    ctx = _make_ctx(tmp_path, kmp, user_id=1)
+
+    queued_row = MagicMock()
+    queued_row.__getitem__ = lambda self, key: {
+        "id": 55,
+        "title": "Senior PM",  # pre-populated from RSS feed
+        "markdown_path": None,
+        "status": "queued",
+    }[key]
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=queued_row)
+        mock_db.update_vacancy_fields = AsyncMock()
+        mock_db.update_vacancy_status = AsyncMock()
+
+        result = await cv_fetch_jd(ctx, "https://djinni.co/jobs/555/")
+
+    # Should NOT have inserted a new record — updates existing
+    mock_db.insert_vacancy.assert_not_called()
+    mock_db.update_vacancy_fields.assert_awaited_once()
+    call_kwargs = mock_db.update_vacancy_fields.call_args
+    assert call_kwargs.args[0] == 55  # vacancy_id
+    assert "✅" in result
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_non_queued_duplicate_skips_fetch(tmp_path):
+    """When existing vacancy has status != 'queued', return early without fetching."""
+    ctx = _make_ctx(tmp_path)
+    existing_row = MagicMock()
+    existing_row.__getitem__ = lambda self, key: {
+        "id": 10,
+        "title": "Old PM",
+        "markdown_path": "/some/path/JD.md",
+        "status": "analyzed",
+    }[key]
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=existing_row)
+
+        result = await cv_fetch_jd(ctx, "https://djinni.co/jobs/10/")
+
+    assert "ℹ️" in result
+    ctx.deps.kmp_adapter.fetch_markdown.assert_not_called()

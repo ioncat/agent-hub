@@ -168,7 +168,6 @@ async def main() -> None:
 
     # ── 7. RSS Watcher ────────────────────────────────────────────────────────
     watcher = RSSWatcher(
-        seen_jobs_path=settings.seen_jobs_path,
         deps=deps,
         telegram_bot=bot,
         poll_interval=settings.rss_poll_interval,
@@ -176,8 +175,8 @@ async def main() -> None:
 
     # ── 8. Run ────────────────────────────────────────────────────────────────
     log.info(
-        "career-agent starting — seen_jobs=%s poll=%ds",
-        settings.seen_jobs_path, settings.rss_poll_interval,
+        "career-agent starting — rss_poll=%ds",
+        settings.rss_poll_interval,
     )
 
     loop = asyncio.get_running_loop()

@@ -87,3 +87,47 @@ async def test_tracker_page_user_id_filter(client):
     resp = client.get(f"/?user_id={uid}")
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
+
+
+# ── POST /api/new-vacancy ─────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_new_vacancy_queues_successfully(client):
+    """POST /api/new-vacancy inserts vacancy with status='queued', returns 201."""
+    uid = await database.insert_user(name="Alice", telegram_chat_id=4001, skill_type="pm")
+
+    resp = client.post("/api/new-vacancy", json={
+        "url": "https://djinni.co/jobs/100/",
+        "title": "Senior PM",
+        "feed_name": "DOU.ua — PM",
+        "user_id": uid,
+    })
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["status"] == "queued"
+    assert "vacancy_id" in data
+
+    # Vacancy is in DB with queued status
+    rows = await database.list_vacancies(status="queued", user_id=uid)
+    assert len(rows) == 1
+    assert rows[0]["url"] == "https://djinni.co/jobs/100/"
+
+
+@pytest.mark.asyncio
+async def test_new_vacancy_duplicate_returns_409(client):
+    """POST /api/new-vacancy with duplicate URL returns 409."""
+    uid = await database.insert_user(name="Bob", telegram_chat_id=4002, skill_type="pm")
+    url = "https://djinni.co/jobs/200/"
+
+    resp1 = client.post("/api/new-vacancy", json={"url": url, "user_id": uid})
+    assert resp1.status_code == 201
+
+    resp2 = client.post("/api/new-vacancy", json={"url": url, "user_id": uid})
+    assert resp2.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_new_vacancy_minimal_payload(client):
+    """POST /api/new-vacancy with only url field (no title/feed_name/user_id) succeeds."""
+    resp = client.post("/api/new-vacancy", json={"url": "https://djinni.co/jobs/300/"})
+    assert resp.status_code == 201
