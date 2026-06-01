@@ -1,457 +1,182 @@
-# career-agent — Architecture & Design
+# Career Agent — Architecture
 
-> Status: pre-development / design phase
-> Last updated: 2026-05-29
+## Что это
 
----
-
-## Vision
-
-Personal AI agent that orchestrates multiple specialized services via tool use.
-First domain: CV/job application pipeline. Designed to extend to any personal workflow.
-
-**Core idea:** Agent = thin orchestration layer. Each domain = a set of tools. Adding a new domain = new tool file only, no core changes. Services stay autonomous, communicate via HTTP contracts.
-
-**Portfolio rationale:** Demonstrates multi-tool AI agent pattern — independent services with HTTP contracts, human-in-the-loop via Telegram, async pipeline, Claude API with prompt caching, adapter-based dependency management.
+AI-помощник для поиска работы. Читает вакансию, оценивает fit, генерирует CV и cover letter. Основная аудитория — Product Manager / Product Owner.
 
 ---
 
-## Service Map
-
-| Repo | Role | Status | Interface |
-|------|------|--------|-----------|
-| `job-board-monitor` | RSS watcher → new job discovery | ✅ Done | `seen_jobs.json` (filesystem) |
-| `knowledge-mirror-parser` | URL → clean Markdown | ✅ Done | **HTTP** `POST /parse` |
-| `callback-cv` | Analysis prompts + PROFILE + cv_to_pdf | ✅ Done | Filesystem + subprocess |
-| `career-agent` | Orchestration + Telegram UI + routing + web | 🔧 This repo | — |
-
----
-
-## Project Structure
+## Компоненты
 
 ```
-career-agent/
-├── core/
-│   ├── telegram.py           — aiogram 3.x, long polling, inline keyboards, callback_query
-│   ├── tool_registry.py      — generic tool registration
-│   ├── router.py             — PydanticAI Agent: routes intent → tool call (LLMClient via DI)
-│   └── llm_client.py         — LLM abstraction: ClaudeProvider (primary), stub fallback
-│
-├── adapters/                 — all external service calls isolated here
-│   ├── kmp_adapter.py        — KMPAdapter: HTTP → knowledge-mirror-parser
-│   └── cv_adapter.py         — CVAdapter: filesystem + subprocess → callback-cv
-│
-├── contracts/                — typed return types (Pydantic BaseModel)
-│   ├── parsed_document.py    — ParsedDocument(title, markdown, source_url)
-│   └── cv_result.py          — CVResult, AnalysisResult, etc.
-│
-├── tools/
-│   ├── cv_fetch_jd.py        — URL → JD.md via KMPAdapter → SQLite
-│   ├── cv_analyze.py         — Phase 1+2: JD + prompts + PROFILE → Claude API → JD_analysis.md
-│   ├── cv_generate.py        — Phase 3+3.5: CV draft → self-review → approve → [Name]_CV.pdf
-│   ├── cv_cover.py           — Phase 4: cover message → Telegram text
-│   └── cv_get_tracker.py     — SQLite query → formatted Telegram summary
-│
-├── prompts/                  — API-clean prompt files (no Claude Code artifacts)
-│   ├── phase1_analysis.md
-│   ├── phase2_fit.md
-│   ├── phase3_cv_draft.md    — CV generation (output NOT shown to user)
-│   ├── phase3_5_review.md    — self-review applied to draft → shown + approved → saved
-│   └── phase4_cover.md
-│
-├── web/
-│   ├── api.py                — FastAPI: /vacancies, /vacancies/{id}
-│   └── templates/
-│       └── tracker.html      — HTMX + Jinja2
-│
-├── db/
-│   └── schema.sql            — SQLite schema
-│
-├── config/
-│   ├── profile.yaml          — service URLs, Telegram chat IDs, paths
-│   └── llm.yaml              — LLM provider config
-│
-└── agent.py                  — entry point: asyncio event loop, two tasks
+┌─────────────────────────────────────────────────────────────────┐
+│                        career-agent                             │
+│                                                                 │
+│  agent.py          — Telegram бот + RSSWatcher                  │
+│  core/router.py    — PydanticAI Agent + tool dispatch           │
+│  core/rss_watcher  — DB polling (status='queued')               │
+│  tools/            — cv_fetch_jd, cv_analyze, cv_generate,      │
+│                       cv_cover, cv_get_tracker                  │
+│  web/api.py        — FastAPI: трекер + /api/new-vacancy         │
+│  db/database.py    — aiosqlite CRUD                             │
+└──────────────┬──────────────────────────────────────────────────┘
+               │ httpx
+       ┌───────┴────────┐         ┌──────────────────┐
+       │ services/parser │         │  services/pdf    │
+       │ kmp-service     │         │  pdf-service     │
+       │ :8001           │         │  :8002           │
+       │ URL → Markdown  │         │  Markdown → PDF  │
+       └─────────────────┘         └──────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  services/job-monitor                                           │
+│  RSS feeds → POST /api/new-vacancy → career-agent DB            │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Adapter Pattern
+## 5 режимов запуска пайплайна
 
-**Principle:** career-agent depends only on contracts, not on service internals.
+### Режим 1 — Автоматический (RSS)
 
 ```
-career-agent tools
-      ↓
-  KMPAdapter.fetch_markdown(url) → ParsedDocument
-      ↓
-  POST http://kmp-service/parse
-      ↓
-  knowledge-mirror-parser (internal implementation irrelevant)
+job-monitor → POST /api/new-vacancy → web/api.py (DB: status=queued)
+                                              ↓
+                                    RSSWatcher (30s poll)
+                                              ↓
+                                     cv_fetch_jd → DB
+                                              ↓
+                              Telegram уведомление (Phase 1)
 ```
 
-**Typed contracts** — adapters return Pydantic models, never raw service objects:
-
-```python
-# contracts/parsed_document.py
-class ParsedDocument(BaseModel):
-    title: str
-    markdown: str
-    source_url: str
-
-# adapters/kmp_adapter.py
-class KMPAdapter:
-    async def fetch_markdown(self, url: str) -> ParsedDocument:
-        resp = await httpx.post(f"{self.base_url}/parse", json={"url": url})
-        return ParsedDocument(**resp.json())
-```
-
-If knowledge-mirror-parser changes its parser engine, adds Redis, switches libraries — career-agent notices nothing. Contract unchanged = zero impact.
-
-**Future-proof:** today adapter wraps HTTP. If service moves, adapter changes. Tools never change.
+- **Кто запускает:** автоматически, без участия пользователя
+- **API:** Anthropic API (через ClaudeProvider в фазах 2–4 — по запросу)
+- **Конфиг:** `services/job-monitor/feeds.json`
 
 ---
 
-## Async Architecture
-
-Production-grade, non-blocking throughout.
+### Режим 2 — Telegram: URL или текст JD
 
 ```
-agent.py  —  single asyncio event loop
-├── Task 1: TelegramPoller   (aiogram 3.x long polling)
-├── Task 2: RSSWatcher       (periodic asyncio.sleep, polls seen_jobs.json)
-└── TaskQueue                (asyncio.Queue)
-         ↓
-    WorkerPool
-    ├── fetch worker   — httpx async (calls kmp-service HTTP)
-    └── llm worker     — PydanticAI + Anthropic async SDK
+Пользователь → Telegram → TelegramBot → Router → tools → Claude API
 ```
 
-**Telegram:** aiogram 3.x (async-native).
-**HTTP calls:** httpx (async, not requests).
-**No blocking I/O** on event loop.
+- **Кто запускает:** пользователь отправляет URL или текст вакансии боту
+- **API:** Anthropic API
+- **Запуск:** `python agent.py`
+- **Интерактив:** да — фазы по подтверждению
 
 ---
 
-## Deployment
+### Режим 3 — Claude Code + Anthropic API (тестирование / ручной запуск)
 
-**Day 1 — Docker Compose (two containers):**
 ```
-docker-compose.yml
-├── career-agent          :8080  — Telegram bot + web tracker + agent logic
-│     ├── httpx → kmp-service:8001
-│     ├── shared volume: vacancies/
-│     └── SQLite: /data/vacancies.db
-│
-└── kmp-service        :8001  — knowledge-mirror-parser + FastAPI endpoint
-      └── POST /parse → returns ParsedDocument JSON
+Пользователь → /pipeline <URL | file.md | ID>
+                    ↓
+             Claude Code запускает scripts/e2e_test.py
+                    ↓
+             Python инструменты → ClaudeProvider → Anthropic API
 ```
 
-**callback-cv** stays on host filesystem — career-agent mounts `vacancies/` as shared volume, calls `cv_to_pdf.py` via subprocess.
-
-**Future — full microservices:**
-- callback-cv gets its own container + HTTP API
-- Adapters switch from subprocess/filesystem to HTTP (no changes in tools layer)
+- **Кто запускает:** разработчик / тестировщик в Claude Code
+- **API:** Anthropic API (через ClaudeProvider проекта)
+- **Команды:**
+  ```
+  /pipeline https://djinni.co/jobs/123/        # URL
+  /pipeline vacancies/djinni/2026-06/123/JD.md # готовый .md файл
+  /pipeline 42                                 # vacancy_id из БД
+  ```
+- **Скрипт напрямую:**
+  ```bash
+  python scripts/e2e_test.py --url https://...
+  python scripts/e2e_test.py --file path/to/JD.md
+  python scripts/e2e_test.py --id 42 --phase generate,cover
+  ```
 
 ---
 
-## Vacancy Input Paths
+### Режим 4 — Claude Code `/analyze` (локальный, без Anthropic API)
 
-**Path 1 — Automated (Djinni / DOU RSS):**
 ```
-RSS feed → job-board-monitor detects new vacancy
-  → RSSWatcher picks up from seen_jobs.json
-  → tool: cv_fetch_jd(url, source)
-      → KMPAdapter.fetch_markdown(url) → HTTP → kmp-service
-      → writes: vacancies/[folder]/JD.md
-      → SQLite: INSERT vacancy (status=new)
-  → Telegram: "🆕 Product Manager at X — Djinni
-               [✅ Analyze] [❌ Skip]"
+Пользователь → /analyze → skill/SKILL.md → Claude Code = LLM
+                                ↓
+                    prompts/[skill_type]/phaseN.md
+                                ↓
+                       vacancies/[Company — Role]/
 ```
 
-**Path 2 — Semi-manual (LinkedIn / other):**
-```
-User drops JD.md into vacancies/[folder]/
-  → agent detects new folder (polling)
-  → SQLite: INSERT vacancy (status=new, source=manual)
-  → Telegram notification → continues from Analyze step
-```
-
-**RSS sources:** Djinni + DOU. Already filtered to PM/PO roles — no LLM pre-filter needed.
+- **Кто запускает:** пользователь в Claude Code
+- **API:** ❌ не используется — Claude Code сам является LLM
+- **Профиль:** `skill/users/[id]/PROFILE.md` (до EPIC-17)
+- **Подробнее:** `docs/local-app.md`
 
 ---
 
-## Full CV Pipeline Flow
+### Режим 5 — Local Web UI (EPIC-19, запланировано)
 
 ```
-[vacancy status=new in SQLite + JD.md on filesystem]
-  ↓
-tool: cv_analyze(vacancy_id)
-  → reads: JD.md + prompts/phase1_analysis.md + prompts/phase2_fit.md
-  → Claude API (cached system prompt: PROFILE.md)
-  → writes: JD_analysis.md
-  → SQLite: UPDATE status=analyzed, fit_score, recommendation
-  ↓
-Telegram → user:  [Quick Scan from JD_analysis.md]
-  "✅ Анализ готов
-   📊 Fit: 8/10 · ✅ Подавать
-   Category: Discovery + Strategy PM
-   Warnings: B2B only; 5 шагов найма
-   [📄 Generate CV] [📋 Tracker] [❌ Skip]"
-  ↓ user taps 📄
-  ↓
-tool: cv_generate(vacancy_id)
-  ├── Phase 3: prompts/phase3_cv_draft.md + PROFILE.md → Claude API → CV draft
-  │   [draft NOT shown to user]
-  ├── Phase 3.5: prompts/phase3_5_review.md + draft → Claude API → self-review
-  │   Telegram: shows self-review + CV text for approval
-  │   [user approves / requests changes]
-  ├── → writes: [Name]_CV.md
-  ├── → CVAdapter.to_pdf([Name]_CV.md) → subprocess cv_to_pdf.py → [Name]_CV.pdf
-  └── → SQLite: UPDATE status=cv_ready
-  ↓
-Telegram: sends [Name]_CV.pdf as file attachment
-  "📄 CV готов  [✉️ Cover message] [✅ Done]"
-  ↓ user taps ✉️ (explicit, not auto)
-  ↓
-tool: cv_cover(vacancy_id)
-  → prompts/phase4_cover.md + JD_analysis.md + PROFILE.md → Claude API
-  → Telegram: cover text as message
-  → writes: [Name]_Cover.md
-  → SQLite: UPDATE status=cover_ready
+Пользователь → браузер http://localhost:8080/app
+                    ↓
+             POST /analyze → FastAPI → ClaudeProvider → Anthropic API
+                    ↓
+             SSE прогресс → download CV.pdf + Cover.md
 ```
 
----
-
-## Prompt Architecture
-
-**Prompt caching** is a first-class architectural element.
-
-```python
-# core/llm_client.py — ClaudeProvider
-system_prompt = [
-    {"type": "text", "text": PROFILE_MD,   "cache_control": {"type": "ephemeral"}},
-    {"type": "text", "text": phase_prompt, "cache_control": {"type": "ephemeral"}},  # also cached
-]
-```
-
-Both system blocks cached → charged once per 5-min TTL. Only the user turn (JD + prior-phase
-output) is uncached. ~3 API calls per CV session → static content cached after the first call.
-
-**Prompt files** (`career-agent/prompts/`) — API-clean, no Claude Code artifacts, no file-save instructions. Agent handles all I/O.
-
-**Phase 3 → 3.5 sequence:**
-1. Claude with `phase3_cv_draft.md` → CV text (hidden)
-2. Claude with `phase3_5_review.md` + CV text → self-review
-3. Show both to user → approve → save + PDF
+- **Кто запускает:** пользователь в браузере
+- **API:** Anthropic API
+- **Статус:** 📋 запланировано (EPIC-19)
 
 ---
 
-## Storage Architecture
+## Сравнительная таблица режимов
 
-**Hybrid: SQLite metadata + filesystem documents**
-
-```sql
-CREATE TABLE vacancies (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    source          TEXT NOT NULL,     -- 'djinni' | 'dou' | 'manual'
-    url             TEXT,
-    title           TEXT NOT NULL,
-    folder_path     TEXT NOT NULL,     -- YYYY-MM-DD_source_slug
-    status          TEXT NOT NULL DEFAULT 'new',
-                                       -- new → analyzed → cv_ready → cover_ready → done | skipped
-    fit_score       REAL,
-    recommendation  TEXT,              -- 'подавать' | 'не подавать'
-    category        TEXT,
-    warnings        TEXT,
-    blockers        TEXT,
-    cv_path         TEXT,
-    pdf_path        TEXT,
-    cover_path      TEXT,
-    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-**Filesystem** — documents only:
-- `vacancies/[YYYY-MM-DD_source_slug]/JD.md`
-- `vacancies/[folder]/JD_analysis.md`
-- `vacancies/[folder]/[Name]_CV.md` + `.pdf`
-- `vacancies/[folder]/[Name]_Cover.md`
-
-**tracker.json** → replaced by SQLite.
+| | Режим 1 (RSS) | Режим 2 (Telegram) | Режим 3 (Claude Code dev) | Режим 4 (/analyze) | Режим 5 (Web UI) |
+|--|:---:|:---:|:---:|:---:|:---:|
+| Anthropic API | ✅ | ✅ | ✅ | ❌ | ✅ |
+| Пользователь вводит URL | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Текст JD (не URL) | ❌ | ✅ | ✅ (--file) | ✅ | ✅ |
+| Интерактив по фазам | ❌ | ✅ | ✅ | ✅ | ✅ (SSE) |
+| Нужен Telegram | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Нужен запущенный бот | ❌ | ✅ | ❌ | ❌ | ✅ |
+| Пишет в БД | ✅ | ✅ | ✅ | ❌ | ✅ |
 
 ---
 
-## Web Tracker
+## Pipeline — фазы
 
-**FastAPI + HTMX + Jinja2** — no npm, no JS framework.
+| Фаза | Инструмент | Входные данные | Артефакт |
+|------|-----------|---------------|---------|
+| 1 — Fetch JD | `cv_fetch_jd` | URL → services/parser | `JD.md` |
+| 2 — Analyze | `cv_analyze` | JD.md + PROFILE → Claude | `JD_analysis.md` |
+| 3 — Generate CV | `cv_generate` | PROFILE + анализ → Claude | `CV.md` |
+| 3.5 — Self-review | _(внутри generate)_ | CV.md → Claude | `CV.md` (revised) |
+| — Render PDF | _(внутри generate)_ | CV.md → services/pdf | `CV.pdf` |
+| 4 — Cover Letter | `cv_cover` | JD + CV → Claude | `Cover.md` |
+
+---
+
+## Структура хранения артефактов
 
 ```
-web/api.py
-├── GET  /                       → tracker.html
-├── GET  /api/vacancies          → JSON list
-├── GET  /api/vacancies/{id}     → single vacancy + full analysis
-└── POST /api/vacancies/{id}/status → update status
+vacancies/
+└── {user_id}/
+    └── {site}/          # djinni | dou | linkedin | other
+        └── {YYYY-MM}/
+            └── {slug}/
+                ├── JD.md
+                ├── JD_analysis.md
+                ├── [Name]_CV.md
+                ├── [Name]_CV.pdf
+                └── [Name]_Cover.md
 ```
 
-FastAPI serves as internal API for agent tools AND future external integrations.
+Режим 4 (`/analyze`): `vacancies/{Company — Role}/` (без user_id, без date-sharding)
 
 ---
 
-## LLM Client
+## Связанные документы
 
-```python
-class LLMClient:
-    async def complete(self, messages, tools=None):
-        try:
-            return await self.primary.complete(messages, tools)
-        except (RateLimitError, OverloadedError):
-            await telegram.notify("⚠️ Claude недоступен. Попробуйте позже.")
-            raise  # no silent degradation for analysis tasks
-
-class OllamaProvider(BaseLLMProvider):
-    async def complete(self, ...):
-        raise NotImplementedError("Local LLM fallback not yet implemented")
-```
-
----
-
-## Telegram Output Format
-
-| Output | Format |
-|--------|--------|
-| New vacancy notification | Text + inline buttons |
-| Analysis result | Text — Quick Scan (fit, rec, warnings) + buttons |
-| CV self-review | Text — review findings + approve buttons |
-| CV file | **PDF attachment** |
-| Cover message | **Text message** |
-| Tracker summary | Text — top N vacancies with status |
-
----
-
-## Open Questions
-
-- [ ] **knowledge-mirror-parser configs:** Djinni + DOU `content_selector` (need HTML inspection)
-- [ ] **Prompt caching via PydanticAI:** verify `cache_control: ephemeral` passes through correctly
-- [ ] **kmp-service port config:** in `profile.yaml` or env var
-
----
-
-## User Profile Schema
-
-**Current state:** single user (Oleksii Bondarenko). Profile lives in `callback-cv/skill/PROFILE.md`.
-
-**Profile file** (`PROFILE.md`) is the canonical source of user identity for all LLM calls.
-Sent as first cached system block on every Claude API call (`cache_control: ephemeral`).
-
-### Required fields (current schema)
-
-| Field | Location | Description |
-|-------|----------|-------------|
-| Name variants | PROFILE.md `## Name variants` | EN formal/informal + native |
-| Contact info | PROFILE.md header | email, Telegram, LinkedIn, GitHub |
-| Summary | PROFILE.md `## Summary` | 3–5 sentence positioning statement |
-| Experience | PROFILE.md `## Experience` | Chronological, metrics-backed |
-| Skills / Certs | PROFILE.md | Top skills, languages, certifications |
-| Honest Gaps | PROFILE.md `## Honest Gaps` | Things LLM must never fabricate |
-| **Archetype** | PROFILE.md `## Archetype & Role Positioning` | See below |
-
-### Archetype field (added 2026-05-31)
-
-`archetype_preference: execution | founder | dual`
-
-Drives Phase 2 analysis behavior:
-- **execution** — emphasize delivery track, metrics, coordination
-- **founder** — emphasize 0→1, co-founder experience, autonomy
-- **dual** — LLM checks JD archetype signal, picks framing dynamically
-
-Archetype delta (JD archetype ≠ CV framing) generates **both**:
-- Warning: flags the mismatch for user attention
-- Adaptation Plan: specific reframing advice from the matching archetype section
-
-### Multi-user (planned — BACKLOG P2)
-
-When generalized: each user gets isolated `PROFILE.md` + vacancies folder + DB namespace.
-Onboarding collects all schema fields above via Telegram conversation.
-See `BACKLOG.md → P2 — Onboarding` for full field list.
-
----
-
-## Design Decisions Log
-
-**2026-05-28:**
-- Multi-service architecture — services stay autonomous, agent orchestrates via tool calls
-- Telegram is primary UI
-- Agent framework not decided
-
-**2026-05-29 — Session 1:**
-- LLM abstraction with fallback stub (Claude primary, Ollama NotImplemented)
-- Long polling, bidirectional Telegram (aiogram 3.x)
-- Both trigger modes: RSS auto + manual folder drop
-- knowledge-mirror-parser for JD fetching — add Djinni + DOU configs
-- Analysis = Claude API call with SKILL.md prompts + PROFILE.md
-- PROFILE.md is user-configurable (current: Oleksii Bondarenko)
-- RSS: Djinni + DOU (no LLM pre-filter)
-- SQLite + filesystem hybrid storage
-- FastAPI + HTMX + Jinja2 web tracker
-- Prompt caching as first-class element
-- Phase 3→3.5 CV draft hidden, shown only after self-review
-
-**2026-05-29 — Session 2:**
-- **PydanticAI** as agent framework. Evaluated: OpenClaw/NanoClaw (platforms, wrong category), LangGraph (overhead), CrewAI (multi-agent pattern mismatch), direct SDK (more boilerplate). PydanticAI: same ecosystem as FastAPI, type-safe, DI built-in, multi-agent ready.
-- **HTTP from day 1** — knowledge-mirror-parser gets FastAPI endpoint, career-agent calls via httpx. Removes aiohttp rewrite blocker. Cleaner service boundaries for portfolio.
-- **Adapter layer** (`core/adapters/`) — all external calls isolated. Agent-hub depends on contracts, not internals.
-- **Typed contracts** (`core/contracts/`) — Pydantic BaseModel return types. `ParsedDocument`, `AnalysisResult`, etc.
-- **pip install -e removed** — HTTP replaces Python imports for knowledge-mirror-parser.
-- **callback-cv** remains filesystem + subprocess (no HTTP needed for Phase 1).
-- **Dependency management:** adapter layer + contract tests + version pinning. Update = explicit event (run tests, bump version).
-- **Docker Compose from day 1** — two containers: career-agent + kmp-service.
-
-**2026-05-31 — Product pivot (major):**
-
-- **Vertical product architecture.** The platform hosts domain verticals (agents). Each vertical is a tight, purpose-built product with a hard-rail pipeline — intentional by design, not a limitation. The CV Agent is the first vertical.
-
-- **ICP = PdM / PO / PM in active job search** (passive as secondary). Platform is PM-domain-specific: prompts, archetype logic, fit dimensions are all PM-aware. Narrow ICP → sharper product.
-
-- **Monorepo consolidation.** All previously external repos (`knowledge-mirror-parser`, `callback-cv`, `job-board-monitor`) move inside career-agent as `services/`. Rule: nothing user-built lives outside. External APIs/platforms (Claude, Telegram, job boards) stay external by definition.
-  - Before moving each service: **audit it** — remove dead code, unused features, anything that doesn't serve the pipeline. Services become organic components, as if built for this system from day one.
-
-- **callback-cv dissolution.** The repo served three purposes:
-  - `PROFILE.md` (candidate data) → becomes a generated artifact from Onboarding, stored in DB. Not a file to hand-edit.
-  - `cv_to_pdf.py` → extracted into `services/pdf/` as a proper HTTP service (`POST /render`). CVAdapter switches from subprocess to HTTP — tools layer unchanged (adapter pattern pays off).
-  - Prompts (`phase1–4.md`) → already migrated to `career-agent/prompts/` in previous sessions.
-
-- **job-board-monitor** → extracted into `services/job-monitor/`, redesigned from file-polling to webhook push (`POST /api/new-vacancy`). Eliminates polling loop, becomes event-driven.
-
-- **Onboarding = PDF → Interview → Profile in DB.**
-  1. User uploads `Profile.pdf` (LinkedIn export or richest CV)
-  2. System converts PDF → Markdown (LLM-friendly format)
-  3. System analyzes the profile, generates a **personalized interview** tailored to the candidate
-  4. Conversational interview extracts full depth of experience, projects, PM-specific framing (Delivery/Discovery/both, archetype, gaps)
-  5. Interview transcript → structured `PROFILE` stored in SQLite (per-user)
-  - Multiple interview passes allowed — profile deepens over time
-  - PROFILE.md becomes a generated artifact, not a hand-edited file
-
-- **Multi-user: design now, infrastructure incrementally.**
-  - Design decisions (data model, isolation, onboarding flow) implemented with multi-user in mind from the start — cheap now, expensive to retrofit later.
-  - SaaS infrastructure (auth, billing, per-user RSS workers, web auth) added incrementally as user base grows.
-
-- **Project rename.** "career-agent" no longer reflects the product identity — it has become a focused vertical service, not a generic hub. Name TBD; tracked in backlog.
-
-**2026-05-31 — Strategic decisions:**
-
-- **AI agents ready — MCP server + REST API.**
-  The platform must be accessible not only to humans but to AI agents and orchestrators. Two layers:
-  - **REST API** — extend existing FastAPI with pipeline endpoints: `POST /analyze`, `POST /generate`, `GET /vacancy/{id}/report`. Enables any HTTP client to trigger the pipeline programmatically.
-  - **MCP server** — expose Career Agent as MCP tools (`analyze_vacancy`, `get_fit_report`, `generate_cv`). Any MCP-compatible client (Claude Desktop, Claude Code, custom agents) can invoke the pipeline as a tool call.
-  - Result: Career Agent becomes a composable component in broader agentic workflows, not just a standalone product.
-  - Architecture: tools layer unchanged — MCP/API are additional transport layers, same as Telegram bot today.
-
-- **UI channel strategy — channel-agnostic architecture.**
-  Telegram is dominant in CIS and parts of EU but niche in the US and Western Europe. There is no Western equivalent with the same combination of rich interactive UI (inline buttons, file sharing, push) and personal (non-corporate) context. Strategy:
-  - **Telegram** — primary channel now. Stays for CIS + EU markets.
-  - **PWA (Progressive Web App)** — next step for Western markets. Extends existing FastAPI + HTMX web tracker. Push notifications (Chrome/Firefox/Safari 16.4+), approve/skip buttons natively in web, PDF delivery. No App Store friction, no install required. Minimum new code — evolution of existing tracker.
-  - **WhatsApp Business API** — secondary for EU / LatAm / global markets. Personal channel, dominant outside US. Limited interactive buttons (up to 3), complex Meta approval process. Deferred until PMF validated.
-  - **Flutter (native mobile)** — long-term option when PMF confirmed and user base justifies App Store overhead.
-  - **Architecture rule:** UI layer is channel-agnostic. Telegram bot is one adapter (`TelegramAdapter`). Adding Slack, WhatsApp, PWA push = new adapter, tools layer unchanged. Rename `core/telegram.py` concept to `notification_channel` in next refactor.
+- `docs/local-app.md` — детали Режима 4 (diagrams, команды, профиль)
+- `docs/delivery/PIVOT-PLAN.md` — план фаз разработки
+- `BACKLOG.md` — статус эпиков
