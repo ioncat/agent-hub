@@ -27,7 +27,7 @@
 
 | Epic | Title | Status |
 |------|-------|--------|
-| [EPIC-13](docs/delivery/epics/EPIC-13-multi-user-data-model.md) | Multi-user data model | 🔄 In progress — Chunk 4 remaining |
+| [EPIC-13](docs/delivery/epics/EPIC-13-multi-user-data-model.md) | Multi-user data model | ✅ Done (2026-06-01) |
 | [EPIC-14](docs/delivery/epics/EPIC-14-services-pdf.md) | services/pdf/ — Kill subprocess PDF | 📋 Planned |
 | [EPIC-15](docs/delivery/epics/EPIC-15-services-parser.md) | services/parser/ — Own the parser | 📋 Planned |
 | [EPIC-16](docs/delivery/epics/EPIC-16-services-job-monitor.md) | services/job-monitor/ — Move + redesign | 📋 Planned |
@@ -145,5 +145,5 @@ See `docs/delivery/epics-archive/EPIC-01-12-pre-pivot.md`
 
 ### Post-pivot
 - **EPIC-18** — Rename `agent-hub` → `career-agent` (2026-06-01)
-- **EPIC-13 Chunks 1–3** — Multi-user data model: `users` table, `user_id` FK, default user seeding (2026-06-01, 236 tests)
+- **EPIC-13** — Multi-user data model: `users` table, `user_id` FK, default user seeding, user-scoped vacancy paths, tracker filter (2026-06-01, 241 tests)
 - Multi-skill routing Phase 1 — `prompts/pm/` + `prompts/generic/`, skill_type in AgentDeps (2026-06-01)
