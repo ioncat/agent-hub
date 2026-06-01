@@ -5,6 +5,20 @@
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 
+-- ── users ─────────────────────────────────────────────────────────────────────
+-- One row per candidate. user_id=1 is the default user (seeded from TELEGRAM_CHAT_ID).
+-- skill_type routes ALL pipeline phases to prompts/[skill_type]/ (pm | generic).
+
+CREATE TABLE IF NOT EXISTS users (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    telegram_chat_id INTEGER UNIQUE,              -- NULL allowed for local/API-only users
+    name             TEXT    NOT NULL DEFAULT '',
+    skill_type       TEXT    NOT NULL DEFAULT 'pm', -- 'pm' | 'generic'
+    created_at       TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_telegram ON users (telegram_chat_id);
+
 -- ── vacancies ────────────────────────────────────────────────────────────────
 -- One row per unique job posting URL.
 -- markdown_path: relative path from project root, e.g. "vacancies/djinni/2024-01/job-123/JD.md"

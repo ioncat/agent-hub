@@ -26,6 +26,8 @@ Do NOT soften gaps. Realistic critique produces better Phase 2 output.
 - Language: Russian — always, regardless of JD language
 - Tone: analytical and objective — state conclusions directly, avoid speculation and emotional language
 - All six sections required. Do not skip. Do not add extra sections.
+- **Label/content split:** Section and field labels are English structural markers — keep as-is. ALL content and values following those labels MUST be in the output language.
+- **Jargon rule: never translate English HR/tech jargon into Russian.** Use borrowed forms: "скрин" (not "экран"), "оффер", "онбординг", "фидбэк", "хайринг-менеджер", "стартап", "пайплайн" etc. When in doubt — keep English jargon or use Russified transliteration, never literal translation.
 
 ## Output Format
 

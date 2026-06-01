@@ -56,7 +56,7 @@ class _Ctx:
 
 async def run_e2e(url: str, phases: list[str]) -> None:
     print(f"\n{'='*60}")
-    print(f"  agent-hub e2e test")
+    print(f"  career-agent e2e test")
     print(f"  URL: {url}")
     print(f"  Phases: {', '.join(phases)}")
     print(f"{'='*60}\n")

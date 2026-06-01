@@ -33,6 +33,8 @@ def _make_ctx(tmp_path: Path, llm=None) -> MagicMock:
     ctx = MagicMock()
     ctx.deps.llm = llm or _make_llm()
     ctx.deps.vacancies_path = tmp_path / "vacancies"
+    ctx.deps.skill_type = "pm"
+    ctx.deps.user_id = 1
     return ctx
 
 

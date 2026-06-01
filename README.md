@@ -81,6 +81,8 @@ flowchart LR
 
 Five-phase Claude API pipeline. All static system content — `PROFILE.md` **and** every phase prompt — is prompt-cached; only the per-vacancy text (JD + prior-phase output) is charged at full rate.
 
+Phase prompts are **skill-type-specific**: each user's `PROFILE.md` carries a `skill_type` field (e.g. `pm`, `generic`) that routes all five phases to `prompts/[skill_type]/`. PM analysis understands archetypes, Founder Proxy signals, and delivery framing. Generic analysis is role-agnostic — suitable for any non-PM role.
+
 ```mermaid
 flowchart TD
     JD["JD.md"] --> P1["Phase 1 — Deep Analysis\nobjections · hidden requirements · archetype signal"]

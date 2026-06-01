@@ -1,5 +1,5 @@
 """
-agent.py — agent-hub entry point.
+agent.py — career-agent entry point.
 
 Startup sequence:
 1. Load Settings from env
@@ -164,7 +164,7 @@ async def main() -> None:
 
     # ── 8. Run ────────────────────────────────────────────────────────────────
     log.info(
-        "agent-hub starting — seen_jobs=%s poll=%ds",
+        "career-agent starting — seen_jobs=%s poll=%ds",
         settings.seen_jobs_path, settings.rss_poll_interval,
     )
 
@@ -190,7 +190,7 @@ async def main() -> None:
         await watcher.stop()
         await bot.stop()
         llm.log_session_summary()
-        log.info("agent-hub stopped")
+        log.info("career-agent stopped")
 
 
 if __name__ == "__main__":

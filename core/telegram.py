@@ -156,7 +156,7 @@ class TelegramBot:
             if not self._is_allowed(message):
                 return
             await message.answer(
-                "👋 <b>agent-hub</b>\n\n"
+                "👋 <b>career-agent</b>\n\n"
                 "Отправь URL вакансии — запущу CV-пайплайн.\n"
                 "Или спроси что-нибудь.",
                 parse_mode=ParseMode.HTML,

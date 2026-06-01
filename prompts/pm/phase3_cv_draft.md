@@ -53,8 +53,7 @@ User will provide:
 ```
 [Selected Name]
 [Headline]
-[Email](mailto:alexeyibondarenko@gmail.com) · [Telegram](https://t.me/ioncat) · [LinkedIn](https://linkedin.com/in/alexibondarenko)
-[GitHub](https://github.com/ioncat?tab=repositories)   ← only if relevant
+[Email](mailto:alexeyibondarenko@gmail.com) · [Telegram](https://t.me/ioncat) · [LinkedIn](https://linkedin.com/in/alexibondarenko) · [GitHub](https://github.com/ioncat?tab=repositories)   ← include GitHub only if relevant; omit entirely if not
 
 SUMMARY
 [2 paragraphs max. Full-arc positioning tailored to this vacancy.]

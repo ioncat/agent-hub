@@ -1,8 +1,21 @@
 # Repositioning Pivot Plan
 
 **Date:** 2026-05-31  
+**Last revised:** 2026-06-01  
 **Status:** Active  
-**Scope:** Full restructure from `agent-hub` generic orchestrator → Career Agent focused vertical service
+**Scope:** Full restructure from `career-agent` generic orchestrator → Career Agent focused vertical service
+
+---
+
+## Revisions — 2026-06-01
+
+Three new architectural facts added after today's work:
+
+1. **Multi-skill prompt routing** — `skill_type` field per user routes ALL pipeline phases to `prompts/[skill_type]/`. Currently: `pm` and `generic`. Must be stored in `users` table (not just PROFILE.md file) — captured in Phase 1.
+
+2. **Per-user vacancy scoping** — vacancies filesystem and DB must be scoped per user. Currently flat `vacancies/[Company]/` doesn't scale to multi-user. New convention: `vacancies/[user_id]/[Company]/`. Web tracker needs `user_id` filter. Captured in Phase 1 (schema) and Phase 7 (tracker).
+
+3. **Local execution mode** — `skill/` pipeline is a working local tool (Claude Code slash commands). Must be formalized as standalone desktop/local web app — runs without Telegram, useful for power users and development. Captured as new Phase 7. Also: two user models currently coexist (`skill/` file-based vs main app DB-based) — convergence path defined in Phase 7.
 
 ---
 
@@ -28,8 +41,11 @@ Full ADR: `ARCHITECTURE.md → Design Decisions Log → 2026-05-31`.
 | PDF generation | `callback-cv` subprocess + foreign venv | `services/pdf/` FastAPI HTTP service |
 | Job discovery | File polling `seen_jobs.json` | Webhook push `POST /api/new-vacancy` |
 | User model | Single hardcoded `TELEGRAM_CHAT_ID` | Multi-user: `users` table, `user_id` everywhere |
-| UI channels | Telegram only | Channel-agnostic adapter pattern (Telegram primary, PWA next) |
+| UI channels | Telegram only | Channel-agnostic: Telegram primary, local web app, PWA next |
 | AI interoperability | None | MCP server + REST API (planned) |
+| Prompt routing | Single `prompts/` root, PM-only | `prompts/[skill_type]/` — all phases skill-specific (pm, generic, …) |
+| Vacancy storage | Flat `vacancies/[Company]/` | Per-user: `vacancies/[user_id]/[Company]/` |
+| Execution mode | Telegram pipeline only | Telegram + standalone local app (no Telegram dependency) |
 
 ---
 
@@ -37,7 +53,7 @@ Full ADR: `ARCHITECTURE.md → Design Decisions Log → 2026-05-31`.
 
 ### callback-cv
 
-**What agent-hub uses:**
+**What career-agent uses:**
 - `cv_to_pdf.py` — Markdown → PDF renderer (fpdf2 + Calibri fonts)
 - `skill/PROFILE.md` — candidate profile (to be replaced by onboarding)
 
@@ -58,7 +74,7 @@ Full ADR: `ARCHITECTURE.md → Design Decisions Log → 2026-05-31`.
 
 ### knowledge-mirror-parser
 
-**What agent-hub uses:**
+**What career-agent uses:**
 - `POST /parse` endpoint — fetch URL → clean Markdown
 - `fetch()` HTTP function with retry logic
 - Site configs for `djinni.co` + `jobs.dou.ua`
@@ -69,7 +85,7 @@ Full ADR: `ARCHITECTURE.md → Design Decisions Log → 2026-05-31`.
 - `config.py` — `djinni.co` + `jobs.dou.ua` configs only
 
 **What to cut:**
-- `database.py` — sitemap cache SQLite (not used by agent-hub)
+- `database.py` — sitemap cache SQLite (not used by career-agent)
 - `processor.py` — batch article processing (not used)
 - `main.py` — CLI entry point for batch scraping (not used)
 - `discover_urls()`, `_parse_sitemap_xml()` — sitemap batch discovery (not used)
@@ -85,7 +101,7 @@ Full ADR: `ARCHITECTURE.md → Design Decisions Log → 2026-05-31`.
 
 ### job-board-monitor
 
-**What agent-hub uses:**
+**What career-agent uses:**
 - `seen_jobs.json` — polled by `core/rss_watcher.py` to detect new vacancies
 
 **What to keep:**
@@ -110,26 +126,37 @@ Phase 3 — services/parser/          ← independent
 Phase 4 — services/job-monitor/     ← independent
 Phase 5 — Onboarding                ← depends on Phase 1
 Phase 6 — Rename                    ← anytime, non-blocking
+Phase 7 — Local execution mode      ← parallel to Phase 5; converges with Phase 5 post-completion
 ```
 
-**Critical path: Phase 1 → Phase 5**
+**Critical path: Phase 1 → Phase 5 → Phase 7 (convergence)**
 
-Phases 2, 3, 4 are independent of each other and of the critical path.
+Phases 2, 3, 4 are independent of each other and of the critical path.  
+Phase 7 can start independently; full value unlocked after Phase 5 (DB profiles).
 
 ---
 
 ### Phase 1 — Multi-user data model
 **Goal:** Design for multi-user from the start. Cheap now, expensive to retrofit.
 
-- [ ] `db/schema.sql` — add `users` table: `id`, `telegram_chat_id`, `name`, `created_at`
+**Schema:**
+- [ ] `db/schema.sql` — add `users` table: `id`, `telegram_chat_id`, `name`, `skill_type`, `created_at`
+  - `skill_type` — routes ALL pipeline phases to `prompts/[skill_type]/` (values: `pm`, `generic`)
 - [ ] Add `user_id` FK to `vacancies`, `llm_usage` (nullable for migration, then default=1)
+- [ ] `vacancies` table — add `fs_path` or derive as `vacancies/[user_id]/[company_slug]/`
+  - Filesystem convention: `vacancies/[user_id]/[Company — Role]/` (create on first save per user)
 - [ ] `db/database.py` — all queries accept and scope by `user_id`
-- [ ] `core/deps.py` — `AgentDeps` carries `user_id`
+- [ ] `core/deps.py` — `AgentDeps` carries `user_id` + `skill_type`
 - [ ] `core/settings.py` — `TELEGRAM_CHAT_ID` creates default user on first run, not a global singleton
-- [ ] Migration: existing rows get `user_id=1`
+- [ ] Migration: existing rows get `user_id=1`, existing `vacancies/[Company]/` paths stay valid (one-time migration to `vacancies/1/[Company]/` or leave as-is with path stored in DB)
 - [ ] Tests: all DB tests pass with `user_id` param
 
-**Does not break:** pipeline phases, LLM client, adapters, web tracker
+**Web tracker — basic multi-user filter (Phase 1 scope):**
+- [ ] `web/api.py` — `GET /tracker?user_id=1` — filter vacancies by user
+- [ ] `web/templates/tracker.html` — user selector dropdown (simple, no auth)
+- Full multi-user tracker UI → Phase 7
+
+**Does not break:** pipeline phases, LLM client, adapters
 
 ---
 
@@ -186,23 +213,61 @@ Phases 2, 3, 4 are independent of each other and of the critical path.
 **Depends on:** Phase 1 (user_id in DB)
 
 - [ ] Telegram: `/start` flow + PDF upload handler
+- [ ] **Ask `skill_type` early** — "What role are you targeting? Product Manager / Other role" → stored in `users.skill_type` → routes all future pipeline phases
 - [ ] PDF → Markdown: `pypdf` or `pdfminer` extraction
-- [ ] LLM: analyze candidate profile → generate personalized PM interview (Delivery/Discovery framing, archetype, gaps)
+- [ ] LLM: analyze candidate profile → generate personalized interview (archetype if PM, domain if generic, gaps)
 - [ ] Multi-turn conversation: Telegram inline keyboard + text input, LLM extracts experience depth
 - [ ] Profile generation: interview transcript → structured profile stored in `users` table (JSON field or separate `profiles` table)
 - [ ] Multi-pass: `/update_profile` command — re-interview, enrich existing profile
 - [ ] `core/llm_client.py` — profile loaded from DB instead of `PROFILE.md` file
 - [ ] Remove `PROFILE_MD_PATH` from settings
+- [ ] Skill_type change: `/set_skill` command — user can switch `pm` ↔ `generic` at any time → updates `users.skill_type`
+
+---
+
+### Phase 7 — Local execution mode (desktop app)
+**Goal:** Standalone local tool — run full pipeline without Telegram. Power user / dev interface.  
+**Non-blocking — parallel to Phase 5.**
+
+**Context:** `skill/` pipeline already exists as a working Claude Code slash-command tool. It runs locally, uses file-based user profiles (`skill/users/[id]/PROFILE.md`), and saves artifacts to `vacancies/`. This phase formalizes it as a proper standalone app.
+
+**Two user models — convergence plan:**
+
+| Model | Where | Users | Profiles | Status |
+|-------|-------|-------|----------|--------|
+| `skill/` local | Claude Code CLI | `skill/users.yaml` + `skill/users/[id]/` | File-based PROFILE.md | Working today |
+| Main app | Telegram + web | `users` DB table | DB-stored (post Phase 5) | Planned Phase 1/5 |
+
+**Convergence path:** local app reads profile from DB (after Phase 5) instead of filesystem. Until Phase 5, local app uses filesystem PROFILE.md. No breaking change during transition.
+
+**Local app — implementation options:**
+
+| Option | Tech | Effort | Notes |
+|--------|------|--------|-------|
+| **A — Local web UI** *(recommended)* | FastAPI + HTMX (extends existing tracker) | 🟡 Medium | New "Analysis" tab in tracker — drop JD, run pipeline, approve steps |
+| B — CLI tool | Python click + rich | 🟢 Low | No UI, terminal output — current `skill/` is already this |
+| C — Packaged app | PyInstaller + FastAPI | 🔴 High | Self-contained binary, no Python needed — overkill for personal tool |
+
+**Recommended: Option A** — extend local web tracker with pipeline controls.
+
+**Scope:**
+- [ ] `web/api.py` — `POST /analyze` endpoint: accepts JD text or URL → triggers pipeline for active user
+- [ ] `web/api.py` — `GET /pipeline/status/{vacancy_id}` — SSE stream of phase progress
+- [ ] `web/templates/local_app.html` — HTMX page: JD drop zone, user selector, phase progress, artifact download
+- [ ] `skill/` pipeline: bridge mode — when `LOCAL_MODE=true`, write to `vacancies/[user_id]/` and call local endpoints instead of Telegram
+- [ ] Phase 5 post-convergence: local app reads profile from DB, drops PROFILE.md dependency
+
+**Does not break:** Telegram pipeline, existing tracker, `skill/` PROFILE.md (used until Phase 5)
 
 ---
 
 ### Phase 6 — Rename
-**Goal:** `agent-hub` → `career-agent` everywhere.  
+**Goal:** `career-agent` → `career-agent` everywhere.  
 **Non-blocking — do when stable.**
 
 - [ ] GitHub repo rename
 - [ ] `docker-compose.yml` service names
-- [ ] Python imports (if any reference `agent-hub` as a package name)
+- [ ] Python imports (if any reference `career-agent` as a package name)
 - [ ] `CLAUDE.md`, `ARCHITECTURE.md`, `BACKLOG.md` headers
 - [ ] `docs/effort-log.md`
 
@@ -229,9 +294,10 @@ The working pipeline must stay green throughout all phases:
 
 | Phase | Done when |
 |-------|-----------|
-| 1 | All existing tests pass with `user_id` param. `users` table exists. Default user seeded. |
+| 1 | All existing tests pass with `user_id` param. `users` table has `skill_type`. Default user seeded. Vacancies saved to `vacancies/[user_id]/`. Tracker filters by `user_id`. |
 | 2 | `cv_generate` produces identical PDF via HTTP as via subprocess. `CVAdapter` uses httpx. `callback-cv` path removed from settings. |
 | 3 | `cv_fetch_jd` fetches real DOU/Djinni URL via `services/parser/`. No reference to `knowledge-mirror-parser` external repo in docker-compose. |
 | 4 | `job-board-monitor` source lives in `services/job-monitor/`. Docker-compose builds it. Pipeline still receives vacancies. |
-| 5 | New user can upload PDF → receive interview → profile stored in DB → CV pipeline uses DB profile instead of file. |
-| 6 | No reference to `agent-hub` in code, config, or docs. |
+| 5 | New user can upload PDF → answer skill_type → receive interview → profile stored in DB → CV pipeline uses DB profile instead of file. |
+| 6 | No reference to `career-agent` in code, config, or docs. |
+| 7 | User can drop JD in local web UI → pipeline runs → CV PDF downloadable — no Telegram required. Local user model reads from DB (Phase 5) or PROFILE.md (pre-Phase 5). |

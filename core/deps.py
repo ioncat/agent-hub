@@ -31,9 +31,13 @@ class AgentDeps:
         vacancies_path: Root directory for vacancy filesystem storage.
         candidate_name: Full name used in CV filenames (e.g. "Oleksii_Bondarenko").
         cv_adapter:     Subprocess wrapper for cv_to_pdf.py in callback-cv repo.
+        user_id:        DB user ID for multi-user scoping. Default=1 (single-user mode).
+        skill_type:     Routes ALL pipeline phases to prompts/[skill_type]/ (e.g. 'pm', 'generic').
     """
     kmp_adapter: KMPAdapter
     llm: ClaudeProvider
     vacancies_path: Path
     candidate_name: str
     cv_adapter: CVAdapter
+    user_id: int = 1
+    skill_type: str = "pm"

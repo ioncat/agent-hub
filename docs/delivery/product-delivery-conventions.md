@@ -3,7 +3,7 @@
 ## User Stories & Backlog Standards
 
 This document defines the standard for writing, reviewing, and
-delivering user stories for agent-hub.
+delivering user stories for career-agent.
 
 The goal of these conventions is to ensure: - shared understanding
 between Product and Engineering, - predictable delivery, - minimal

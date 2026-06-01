@@ -1,6 +1,6 @@
-# agent-hub — Backlog
+# career-agent — Backlog
 
-> Last updated: 2026-05-31
+> Last updated: 2026-06-01
 > ⚠️ Major pivot 2026-05-31: product is now a focused vertical service for PdM/PO/PM job search.
 > Monorepo consolidation, onboarding redesign, multi-user data model added as top priorities.
 > See ARCHITECTURE.md → Design Decisions Log → 2026-05-31 for full context.
@@ -75,6 +75,71 @@ Design now — infrastructure incrementally.
 - [ ] Run `cv_generate` (Phase 3 + 3.5) on vacancy #47 via e2e_test.py
 - [ ] Run `cv_cover` (Phase 4) on vacancy #47
 - [ ] Verify: CV.md + PDF artifacts, status transitions, Telegram messages
+
+### 🟡 Multi-skill architecture — skill_type-based prompt routing
+
+**Goal:** Support generic skill (any role) + domain-specific skills (PM, PO, SWE, Design). Route prompts by user's `skill_type` from PROFILE.md.
+
+**Architecture:**
+- `skill_type` field in PROFILE.md → `## Settings`
+- `prompts/[skill_type]/` structure (pm/, generic/)
+- ALL phases (1–4) are skill-type-specific — no universal phases
+- `/analyze` reads `skill_type` → loads matching prompts
+
+**Scope Phase 1 — ✅ DONE (2026-06-01):**
+- [x] Plan generic skill: SKILL_TYPES.md created (PM vs Generic reference table)
+- [x] Restructure `prompts/` directory — all phases in `pm/` and `generic/`
+- [x] Create `prompts/generic/` — phase1, phase2, phase3_cv_draft, phase3_5_review, phase4_cover
+- [x] Migrate PM prompts to `prompts/pm/` — all 5 phases
+- [x] Update `/analyze` skill (SKILL.md) to read `skill_type` and route all phases
+- [x] Test: user 001 (PM) — SOLAR Digital full pipeline ✅ | user 002 (generic) — AlphaNova analysis ✅
+
+**Scope Phase 2:**
+- [ ] Add `skill_type` to onboarding flow (Telegram /start wizard)
+
+---
+
+### 🟡 PDF template system — decouple design from generation logic
+
+**Goal:** Separate CV/JD PDF design from code logic. Enable non-developer style iteration without token overhead.
+
+**Problem:**
+- cv_to_pdf.py: 400+ lines of fpdf2 boilerplate mixed with styling
+- Style changes (spacing, fonts, colors) require code edit + test cycle
+- Growing complexity: Quick Scan two-column, table rendering, status emoji → harder to maintain
+- Not suitable for Claude prompt context (too large, too implementation-specific)
+
+**Approach — Option A (HTML templates + weasyprint/wkhtmltopdf):**
+- Store design as HTML + CSS in `callback-cv/templates/cv.html`, `jd_analysis.html`
+- Data → template substitution (Jinja2): `render_template('cv.html', data={...})`
+- HTML → PDF: weasyprint (pure Python) or wkhtmltopdf (subprocess)
+- Pros: standard web tech, easy to iterate style, Figma → HTML pipeline
+- Cons: external tool (wkhtmltopdf) or dependency (weasyprint); slower than fpdf2
+
+**Approach — Option B (Template + fpdf2):**
+- Keep fpdf2, but extract style values to YAML config: `templates/cv_style.yaml`
+- Store render logic as data-driven functions: `quick_scan_block(data, style)`, `table_block(data, style)`
+- Logic stays in Python, but styling is separate and swappable
+- Pros: fast, no new dependencies, incremental refactor
+- Cons: still Python-heavy; less suitable for designer collaboration
+
+**Approach — Option C (Hybrid — HTML for preview, fpdf2 for final):**
+- Generate HTML version → browser preview
+- User approves → convert HTML to PDF (weasyprint or print-to-PDF)
+- Pros: preview loop, instant iteration
+- Cons: two render paths to maintain
+
+**Decision point:** Pick Option A (full HTML), Option B (style config), or Option C (dual path). Recommend A for long-term maintainability, B for quick win.
+
+**Scope (Phase 1):**
+- [ ] Decide approach (A/B/C) + document reasoning in `docs/discovery/pdf-design-system.md`
+- [ ] Prototype one template (CV or JD Analysis) in chosen format
+- [ ] Measure: render time, file size, design flexibility, code reduction
+
+**Scope (Phase 2):**
+- [ ] Migrate all PDF outputs to template system
+- [ ] Build style editor / Telegram admin panel for non-dev style tweaks
+- [ ] Add multi-language template variants (EN/UA/RU)
 
 ---
 
@@ -160,7 +225,7 @@ Phase 4 (cover):     ~$0.05
 
 ## P4.5 — Unit Economics Dashboard
 
-**Context:** agent-hub как CV-processing сервис. Данные из таблицы `llm_usage`.
+**Context:** career-agent как CV-processing сервис. Данные из таблицы `llm_usage`.
 
 - [ ] `web/api.py`: новый endpoint `GET /economics`
 - [ ] `web/templates/economics.html` — дашборд с расчётами и графиками:
@@ -188,7 +253,7 @@ SELECT v.id, v.title, SUM(u.cost_usd) AS cost FROM llm_usage u JOIN vacancies v 
 - [ ] README: Mermaid logical diagram + architecture diagram + state machine diagram
 - [ ] QUICKSTART.md — one-command startup guide
 - [ ] USER_GUIDE.md — Telegram commands + web tracker usage
-- [ ] **Setup / Prerequisites doc** — external repos must be cloned alongside agent-hub:
+- [ ] **Setup / Prerequisites doc** — external repos must be cloned alongside career-agent:
   - `callback-cv` (🔴 mandatory) — filesystem path `../callback-cv`; provides PROFILE.md + cv_to_pdf.py
   - `knowledge-mirror-parser` (🟠 for URL fetch) — HTTP service `KMP_BASE_URL`; docker-compose builds from `../knowledge-mirror-parser`
   - `job-board-monitor` (🟢 optional) — produces `seen_jobs.json` for auto-discovery; or use `scripts/emit_vacancy.py`
@@ -214,7 +279,7 @@ SELECT v.id, v.title, SUM(u.cost_usd) AS cost FROM llm_usage u JOIN vacancies v 
 - RSS Watcher: core/rss_watcher.py + scripts/emit_vacancy.py
 - File logging: RotatingFileHandler (logs/agent.log, 5MB×5)
 - Timing + DB state machine logs
-- Dockerfile + docker-compose.yml (kmp-service + agent-hub + web-tracker)
+- Dockerfile + docker-compose.yml (kmp-service + career-agent + web-tracker)
 - scripts/start_tracker.bat, scripts/e2e_test.py, scripts/import_tracker.py
 - .env.example, .gitignore
 

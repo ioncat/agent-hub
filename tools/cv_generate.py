@@ -87,9 +87,10 @@ async def cv_generate(
     jd_text = jd_path.read_text(encoding="utf-8")
     analysis_text = analysis_path.read_text(encoding="utf-8")
 
-    # ── Load prompts ──────────────────────────────────────────────────────────
-    phase3_prompt = (_PROMPTS_DIR / "phase3_cv_draft.md").read_text(encoding="utf-8")
-    phase35_prompt = (_PROMPTS_DIR / "phase3_5_review.md").read_text(encoding="utf-8")
+    # ── Load prompts (skill_type-routed) ─────────────────────────────────────
+    skill_dir = _PROMPTS_DIR / ctx.deps.skill_type
+    phase3_prompt = (skill_dir / "phase3_cv_draft.md").read_text(encoding="utf-8")
+    phase35_prompt = (skill_dir / "phase3_5_review.md").read_text(encoding="utf-8")
 
     # ── Phase 3: CV Draft (hidden) ────────────────────────────────────────────
     run3_id = await database.insert_pipeline_run(vacancy_id, phase="phase3")

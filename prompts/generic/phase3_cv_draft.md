@@ -1,0 +1,97 @@
+# Phase 3: CV Generation (Draft)
+
+Generate a tailored CV for the candidate based on the JD analysis.
+The candidate's full profile and experience are in your system context (PROFILE.md).
+
+**This is a DRAFT — it will NOT be shown to the user. Phase 3.5 self-review runs next.**
+
+---
+
+## Input
+
+User will provide:
+1. JD text
+2. JD_analysis.md content (Phase 1 + Phase 2 output)
+3. Target language (English / Ukrainian / both)
+4. Selected candidate name variant
+
+---
+
+## NON-NEGOTIABLE Rules
+
+1. **NEVER copy-paste JD phrases verbatim** — absorb meaning, rewrite in natural language
+2. **NEVER change actual job titles** — dishonest and verifiable
+3. **NEVER fabricate experience** — if it doesn't exist, don't claim it
+4. **NEVER remove a work experience entry** — every job in PROFILE.md stays in CV
+5. **CV language = input language** — English JD → English CV; Ukrainian JD → Ukrainian CV
+6. **Avoid AI clichés** — "AI-Native", "AI-Driven mindset" etc.
+7. **Avoid first-person pronouns** — standard CV convention
+8. **Metrics belong in Key Results only** — do not duplicate in prose
+9. **NO Location**
+10. **Certifications** — include only if directly relevant to this vacancy; omit otherwise
+
+---
+
+## CV Structure
+
+```
+[Selected Name]
+[Professional headline — candidate's actual role, from PROFILE.md]
+[Email](mailto:[email])   ← read from PROFILE.md → contact section
+
+SUMMARY
+[2 paragraphs max. Tailored to this vacancy's pain and requirements.]
+
+EXPERIENCE
+
+[Role Title — exact as in employment records]
+[Company | Dates]
+[1–2 paragraphs: what was done, key context — tailored to this vacancy]
+Key results:
+• [Concrete outcome or metric]
+• [Concrete outcome or metric]
+
+[...repeat for all roles, reverse chronological...]
+
+SKILLS                           ← include if relevant to this role type
+[Grouped list of relevant hard and soft skills from PROFILE.md]
+
+CERTIFICATIONS                   ← include only if directly relevant; omit otherwise
+[Only real, verifiable — read from PROFILE.md]
+```
+
+**Headline:** use candidate's professional title as stated in PROFILE.md. Adjust only if role clearly targets a different function (e.g. candidate is EA/PA applying to Operations role → "Operations & Administrative Professional").
+
+**Contact:** read from PROFILE.md → contact section. Include email. Include LinkedIn if present. No phone. No location.
+
+---
+
+## Skills Section Rules
+
+- Include if vacancy requires specific tools, systems, or competencies worth listing
+- Group by category (e.g. Tools / Languages / Competencies)
+- Only include skills with evidence in PROFILE.md — no invented skills
+- Keep concise — max 4–6 lines
+
+---
+
+## Tailoring Logic
+
+Based on role type from Phase 1 (section 1.3–1.4):
+- Execution-heavy → lead with delivery track record, operational discipline, concrete results
+- Coordination-heavy → lead with stakeholder management, cross-functional communication
+- Specialist → lead with domain expertise depth
+- Generalist → lead with breadth + adaptability + multi-priority management
+
+Emphasis = adjust language and which Key Results to surface first. Never delete entries.
+
+---
+
+## Adaptation Plan Implementation
+
+`JD_analysis.md` contains `## Adaptation Plan` from Phase 2. Implement ALL listed actions in this draft.
+
+**Fit Breakdown ⚠️ items** (from Phase 2): where candidate has partial/indirect evidence —
+address by reframing existing experience. Do NOT fabricate. Do NOT claim ✅ if profile shows ⚠️.
+
+**Fit Breakdown ❌ items**: do not mention, do not fabricate, do not imply.

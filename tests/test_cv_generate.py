@@ -59,6 +59,8 @@ def _make_ctx(tmp_path: Path, llm=None, cv_adapter=None) -> MagicMock:
     ctx.deps.cv_adapter = cv_adapter or _make_cv_adapter()
     ctx.deps.candidate_name = "Oleksii_Bondarenko"
     ctx.deps.vacancies_path = tmp_path / "vacancies"
+    ctx.deps.skill_type = "pm"
+    ctx.deps.user_id = 1
     return ctx
 
 

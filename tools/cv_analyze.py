@@ -68,9 +68,11 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
 
     jd_text = jd_path.read_text(encoding="utf-8")
 
-    # ── Load prompts from disk ────────────────────────────────────────────────
-    phase1_prompt = (_PROMPTS_DIR / "phase1_analysis.md").read_text(encoding="utf-8")
-    phase2_prompt = (_PROMPTS_DIR / "phase2_fit.md").read_text(encoding="utf-8")
+    # ── Load prompts from disk (skill_type-routed) ───────────────────────────
+    skill_type = ctx.deps.skill_type
+    skill_dir = _PROMPTS_DIR / skill_type
+    phase1_prompt = (skill_dir / "phase1_analysis.md").read_text(encoding="utf-8")
+    phase2_prompt = (skill_dir / "phase2_fit.md").read_text(encoding="utf-8")
 
     # ── Phase 1: JD Analysis ──────────────────────────────────────────────────
     run1_id = await database.insert_pipeline_run(vacancy_id, phase="phase1")

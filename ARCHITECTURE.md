@@ -1,4 +1,4 @@
-# agent-hub — Architecture & Design
+# career-agent — Architecture & Design
 
 > Status: pre-development / design phase
 > Last updated: 2026-05-29
@@ -23,14 +23,14 @@ First domain: CV/job application pipeline. Designed to extend to any personal wo
 | `job-board-monitor` | RSS watcher → new job discovery | ✅ Done | `seen_jobs.json` (filesystem) |
 | `knowledge-mirror-parser` | URL → clean Markdown | ✅ Done | **HTTP** `POST /parse` |
 | `callback-cv` | Analysis prompts + PROFILE + cv_to_pdf | ✅ Done | Filesystem + subprocess |
-| `agent-hub` | Orchestration + Telegram UI + routing + web | 🔧 This repo | — |
+| `career-agent` | Orchestration + Telegram UI + routing + web | 🔧 This repo | — |
 
 ---
 
 ## Project Structure
 
 ```
-agent-hub/
+career-agent/
 ├── core/
 │   ├── telegram.py           — aiogram 3.x, long polling, inline keyboards, callback_query
 │   ├── tool_registry.py      — generic tool registration
@@ -78,10 +78,10 @@ agent-hub/
 
 ## Adapter Pattern
 
-**Principle:** agent-hub depends only on contracts, not on service internals.
+**Principle:** career-agent depends only on contracts, not on service internals.
 
 ```
-agent-hub tools
+career-agent tools
       ↓
   KMPAdapter.fetch_markdown(url) → ParsedDocument
       ↓
@@ -106,7 +106,7 @@ class KMPAdapter:
         return ParsedDocument(**resp.json())
 ```
 
-If knowledge-mirror-parser changes its parser engine, adds Redis, switches libraries — agent-hub notices nothing. Contract unchanged = zero impact.
+If knowledge-mirror-parser changes its parser engine, adds Redis, switches libraries — career-agent notices nothing. Contract unchanged = zero impact.
 
 **Future-proof:** today adapter wraps HTTP. If service moves, adapter changes. Tools never change.
 
@@ -138,7 +138,7 @@ agent.py  —  single asyncio event loop
 **Day 1 — Docker Compose (two containers):**
 ```
 docker-compose.yml
-├── agent-hub          :8080  — Telegram bot + web tracker + agent logic
+├── career-agent          :8080  — Telegram bot + web tracker + agent logic
 │     ├── httpx → kmp-service:8001
 │     ├── shared volume: vacancies/
 │     └── SQLite: /data/vacancies.db
@@ -147,7 +147,7 @@ docker-compose.yml
       └── POST /parse → returns ParsedDocument JSON
 ```
 
-**callback-cv** stays on host filesystem — agent-hub mounts `vacancies/` as shared volume, calls `cv_to_pdf.py` via subprocess.
+**callback-cv** stays on host filesystem — career-agent mounts `vacancies/` as shared volume, calls `cv_to_pdf.py` via subprocess.
 
 **Future — full microservices:**
 - callback-cv gets its own container + HTTP API
@@ -238,7 +238,7 @@ system_prompt = [
 Both system blocks cached → charged once per 5-min TTL. Only the user turn (JD + prior-phase
 output) is uncached. ~3 API calls per CV session → static content cached after the first call.
 
-**Prompt files** (`agent-hub/prompts/`) — API-clean, no Claude Code artifacts, no file-save instructions. Agent handles all I/O.
+**Prompt files** (`career-agent/prompts/`) — API-clean, no Claude Code artifacts, no file-save instructions. Agent handles all I/O.
 
 **Phase 3 → 3.5 sequence:**
 1. Claude with `phase3_cv_draft.md` → CV text (hidden)
@@ -400,13 +400,13 @@ See `BACKLOG.md → P2 — Onboarding` for full field list.
 
 **2026-05-29 — Session 2:**
 - **PydanticAI** as agent framework. Evaluated: OpenClaw/NanoClaw (platforms, wrong category), LangGraph (overhead), CrewAI (multi-agent pattern mismatch), direct SDK (more boilerplate). PydanticAI: same ecosystem as FastAPI, type-safe, DI built-in, multi-agent ready.
-- **HTTP from day 1** — knowledge-mirror-parser gets FastAPI endpoint, agent-hub calls via httpx. Removes aiohttp rewrite blocker. Cleaner service boundaries for portfolio.
+- **HTTP from day 1** — knowledge-mirror-parser gets FastAPI endpoint, career-agent calls via httpx. Removes aiohttp rewrite blocker. Cleaner service boundaries for portfolio.
 - **Adapter layer** (`core/adapters/`) — all external calls isolated. Agent-hub depends on contracts, not internals.
 - **Typed contracts** (`core/contracts/`) — Pydantic BaseModel return types. `ParsedDocument`, `AnalysisResult`, etc.
 - **pip install -e removed** — HTTP replaces Python imports for knowledge-mirror-parser.
 - **callback-cv** remains filesystem + subprocess (no HTTP needed for Phase 1).
 - **Dependency management:** adapter layer + contract tests + version pinning. Update = explicit event (run tests, bump version).
-- **Docker Compose from day 1** — two containers: agent-hub + kmp-service.
+- **Docker Compose from day 1** — two containers: career-agent + kmp-service.
 
 **2026-05-31 — Product pivot (major):**
 
@@ -414,13 +414,13 @@ See `BACKLOG.md → P2 — Onboarding` for full field list.
 
 - **ICP = PdM / PO / PM in active job search** (passive as secondary). Platform is PM-domain-specific: prompts, archetype logic, fit dimensions are all PM-aware. Narrow ICP → sharper product.
 
-- **Monorepo consolidation.** All previously external repos (`knowledge-mirror-parser`, `callback-cv`, `job-board-monitor`) move inside agent-hub as `services/`. Rule: nothing user-built lives outside. External APIs/platforms (Claude, Telegram, job boards) stay external by definition.
+- **Monorepo consolidation.** All previously external repos (`knowledge-mirror-parser`, `callback-cv`, `job-board-monitor`) move inside career-agent as `services/`. Rule: nothing user-built lives outside. External APIs/platforms (Claude, Telegram, job boards) stay external by definition.
   - Before moving each service: **audit it** — remove dead code, unused features, anything that doesn't serve the pipeline. Services become organic components, as if built for this system from day one.
 
 - **callback-cv dissolution.** The repo served three purposes:
   - `PROFILE.md` (candidate data) → becomes a generated artifact from Onboarding, stored in DB. Not a file to hand-edit.
   - `cv_to_pdf.py` → extracted into `services/pdf/` as a proper HTTP service (`POST /render`). CVAdapter switches from subprocess to HTTP — tools layer unchanged (adapter pattern pays off).
-  - Prompts (`phase1–4.md`) → already migrated to `agent-hub/prompts/` in previous sessions.
+  - Prompts (`phase1–4.md`) → already migrated to `career-agent/prompts/` in previous sessions.
 
 - **job-board-monitor** → extracted into `services/job-monitor/`, redesigned from file-polling to webhook push (`POST /api/new-vacancy`). Eliminates polling loop, becomes event-driven.
 
@@ -437,7 +437,7 @@ See `BACKLOG.md → P2 — Onboarding` for full field list.
   - Design decisions (data model, isolation, onboarding flow) implemented with multi-user in mind from the start — cheap now, expensive to retrofit later.
   - SaaS infrastructure (auth, billing, per-user RSS workers, web auth) added incrementally as user base grows.
 
-- **Project rename.** "agent-hub" no longer reflects the product identity — it has become a focused vertical service, not a generic hub. Name TBD; tracked in backlog.
+- **Project rename.** "career-agent" no longer reflects the product identity — it has become a focused vertical service, not a generic hub. Name TBD; tracked in backlog.
 
 **2026-05-31 — Strategic decisions:**
 

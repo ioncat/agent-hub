@@ -52,6 +52,9 @@ docs/discovery/
 # Personal skill + profile (private data — not for public repo)
 skill/
 
+# Fonts — licensed, not for public repo (copy from C:/Windows/Fonts/ or callback-cv/fonts/)
+fonts/
+
 # Windows OS junk
 *.lnk
 

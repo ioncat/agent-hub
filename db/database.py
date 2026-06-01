@@ -1,7 +1,7 @@
 """
 db/database.py — async SQLite layer via aiosqlite.
 
-All DB access in agent-hub goes through this module.
+All DB access in career-agent goes through this module.
 Never write raw SQL in tools or adapters — use helpers here.
 
 Usage:
@@ -54,6 +54,9 @@ async def init_db() -> None:
             "ALTER TABLE llm_usage ADD COLUMN budget_tokens   INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE llm_usage ADD COLUMN thinking_tokens INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE llm_usage ADD COLUMN elapsed_ms      INTEGER NOT NULL DEFAULT 0",
+            # Multi-user: user_id FK (nullable — existing rows remain valid, NULL = user_id=1)
+            "ALTER TABLE vacancies ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
+            "ALTER TABLE llm_usage ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
         ]:
             try:
                 await db.execute(migration)
@@ -74,6 +77,80 @@ async def get_db() -> AsyncIterator[aiosqlite.Connection]:
         yield db
 
 
+# ── User helpers ─────────────────────────────────────────────────────────────
+
+async def insert_user(
+    name: str,
+    telegram_chat_id: int | None = None,
+    skill_type: str = "pm",
+) -> int:
+    """Insert new user. Returns new row id.
+
+    telegram_chat_id may be None for local/API-only users.
+    Raises sqlite3.IntegrityError if telegram_chat_id already exists.
+    """
+    async with get_db() as db:
+        cursor = await db.execute(
+            """
+            INSERT INTO users (telegram_chat_id, name, skill_type)
+            VALUES (?, ?, ?)
+            """,
+            (telegram_chat_id, name, skill_type),
+        )
+        await db.commit()
+        return cursor.lastrowid  # type: ignore[return-value]
+
+
+async def get_user_by_id(user_id: int) -> aiosqlite.Row | None:
+    """Return user row by id or None."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT * FROM users WHERE id = ?", (user_id,)
+        )
+        return await cursor.fetchone()
+
+
+async def get_user_by_telegram_id(telegram_chat_id: int) -> aiosqlite.Row | None:
+    """Return user row by Telegram chat_id or None."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT * FROM users WHERE telegram_chat_id = ?", (telegram_chat_id,)
+        )
+        return await cursor.fetchone()
+
+
+async def get_or_create_default_user(
+    telegram_chat_id: int,
+    name: str = "Default User",
+    skill_type: str = "pm",
+) -> int:
+    """Return existing user_id for this telegram_chat_id, or create and return new one.
+
+    Called on agent startup. Ensures user_id=1 (first user) is always available.
+    """
+    row = await get_user_by_telegram_id(telegram_chat_id)
+    if row is not None:
+        return row["id"]
+    return await insert_user(name=name, telegram_chat_id=telegram_chat_id, skill_type=skill_type)
+
+
+async def list_users() -> list[aiosqlite.Row]:
+    """Return all users ordered by id."""
+    async with get_db() as db:
+        cursor = await db.execute("SELECT * FROM users ORDER BY id ASC")
+        return await cursor.fetchall()
+
+
+async def update_user_skill_type(user_id: int, skill_type: str) -> None:
+    """Update skill_type for a user. Called by /set_skill command."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE users SET skill_type = ? WHERE id = ?",
+            (skill_type, user_id),
+        )
+        await db.commit()
+
+
 # ── Vacancy helpers ───────────────────────────────────────────────────────────
 
 async def insert_vacancy(
@@ -81,18 +158,20 @@ async def insert_vacancy(
     title: str | None = None,
     site: str | None = None,
     markdown_path: str | None = None,
+    user_id: int | None = None,
 ) -> int:
     """Insert new vacancy. Returns new row id.
 
+    user_id: optional FK to users table. NULL = legacy/unscoped (treated as user_id=1).
     Raises sqlite3.IntegrityError if URL already exists — caller should handle.
     """
     async with get_db() as db:
         cursor = await db.execute(
             """
-            INSERT INTO vacancies (url, title, site, markdown_path)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO vacancies (url, title, site, markdown_path, user_id)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (url, title, site, markdown_path),
+            (url, title, site, markdown_path, user_id),
         )
         await db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
@@ -141,19 +220,34 @@ async def update_vacancy_status(vacancy_id: int, status: str) -> None:
         await db.commit()
 
 
-async def list_vacancies(status: str | None = None, limit: int = 50) -> list[aiosqlite.Row]:
-    """Return vacancies ordered by created_at desc. Optionally filter by status."""
+async def list_vacancies(
+    status: str | None = None,
+    user_id: int | None = None,
+    limit: int = 50,
+) -> list[aiosqlite.Row]:
+    """Return vacancies ordered by created_at desc. Optionally filter by status and/or user_id.
+
+    user_id=None → return all users (admin/unfiltered view).
+    user_id=N    → return only vacancies belonging to that user.
+    """
     async with get_db() as db:
+        conditions: list[str] = []
+        params: list = []
+
         if status:
-            cursor = await db.execute(
-                "SELECT * FROM vacancies WHERE status = ? ORDER BY created_at DESC LIMIT ?",
-                (status, limit),
-            )
-        else:
-            cursor = await db.execute(
-                "SELECT * FROM vacancies ORDER BY created_at DESC LIMIT ?",
-                (limit,),
-            )
+            conditions.append("status = ?")
+            params.append(status)
+        if user_id is not None:
+            conditions.append("user_id = ?")
+            params.append(user_id)
+
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        params.append(limit)
+
+        cursor = await db.execute(
+            f"SELECT * FROM vacancies {where} ORDER BY created_at DESC LIMIT ?",
+            params,
+        )
         return await cursor.fetchall()
 
 
@@ -227,6 +321,7 @@ async def insert_llm_usage(
     cache_read_tokens: int,
     cost_usd: float,
     vacancy_id: int | None = None,
+    user_id: int | None = None,
     profile_tokens: int = 0,
     prompt_tokens: int = 0,
     user_tokens: int = 0,
@@ -238,20 +333,21 @@ async def insert_llm_usage(
 
     Input breakdown (profile/prompt/user) is estimated from text length (len//4, ±10%).
     API-reported totals (input/output/cache) are exact from the response.
+    user_id: optional FK for per-user cost analytics.
     """
     async with get_db() as db:
         cursor = await db.execute(
             """
             INSERT INTO llm_usage
-                (vacancy_id, phase, model,
+                (vacancy_id, user_id, phase, model,
                  profile_tokens, prompt_tokens, user_tokens,
                  input_tokens, output_tokens,
                  cache_write_tokens, cache_read_tokens,
                  budget_tokens, thinking_tokens,
                  elapsed_ms, cost_usd)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (vacancy_id, phase, model,
+            (vacancy_id, user_id, phase, model,
              profile_tokens, prompt_tokens, user_tokens,
              input_tokens, output_tokens,
              cache_write_tokens, cache_read_tokens,

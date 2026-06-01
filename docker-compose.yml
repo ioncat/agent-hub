@@ -15,8 +15,8 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # ── agent-hub — Telegram bot + RSS watcher ─────────────────────────────────
-  agent-hub:
+  # ── career-agent — Telegram bot + RSS watcher ──────────────────────────────
+  career-agent:
     build:
       context: .
       dockerfile: Dockerfile
@@ -30,7 +30,7 @@ services:
     volumes:
       - ./db:/app/db                        # SQLite DB — persisted on host
       - ./vacancies:/app/vacancies          # vacancy folders — persisted on host
-      - ../callback-cv:/app/callback-cv:ro  # PROFILE.md + cv_to_pdf.py (read-only)
+      - ../callback-cv:/app/callback-cv:ro  # PROFILE.md + cv_to_pdf.py (read-only, until Phase 2)
     depends_on:
       kmp-service:
         condition: service_healthy
@@ -55,5 +55,5 @@ services:
       - ./vacancies:/app/vacancies:ro
       - ../callback-cv:/app/callback-cv:ro
     depends_on:
-      - agent-hub
+      - career-agent
     restart: unless-stopped

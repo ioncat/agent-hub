@@ -113,7 +113,7 @@ def test_load_settings_happy_path(monkeypatch):
     s = load_settings()
     assert s.anthropic_api_key == "sk-ant-test"
     assert s.telegram_chat_id == 12345
-    assert s.llm_model == "claude-opus-4-5"  # default
+    assert s.llm_model == "claude-sonnet-4-6"  # default (updated 2026-05-30)
 
 
 def test_load_settings_custom_model(monkeypatch):

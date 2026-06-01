@@ -82,8 +82,8 @@ async def cv_cover(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
     analysis_text = analysis_path.read_text(encoding="utf-8")
     cv_text = cv_path.read_text(encoding="utf-8")
 
-    # ── Load prompt ───────────────────────────────────────────────────────────
-    phase4_prompt = (_PROMPTS_DIR / "phase4_cover.md").read_text(encoding="utf-8")
+    # ── Load prompt (skill_type-routed) ──────────────────────────────────────
+    phase4_prompt = (_PROMPTS_DIR / ctx.deps.skill_type / "phase4_cover.md").read_text(encoding="utf-8")
 
     # ── Phase 4: Cover Message ────────────────────────────────────────────────
     run_id = await database.insert_pipeline_run(vacancy_id, phase="phase4")
