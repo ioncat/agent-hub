@@ -3,7 +3,7 @@ core/settings.py — application config loaded from env vars.
 
 Required vars: ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 Optional vars (have defaults): LLM_MODEL, PROFILE_MD_PATH, DB_PATH, PARSER_URL,
-                               CANDIDATE_NAME, PDF_SERVICE_URL
+                               CANDIDATE_NAME, PDF_SERVICE_URL, MULTI_USER_ENABLED
 
 Fails fast on startup if required vars are missing — never starts in broken state.
 
@@ -44,6 +44,11 @@ class Settings:
     rss_poll_interval: int = 60  # seconds between seen_jobs.json polls
     agent_mode: str = "production"  # "testing" → confirm before each LLM API call
     default_skill_type: str = "pm"  # skill_type for default user; overridable via DEFAULT_SKILL_TYPE
+    # MULTI_USER_ENABLED=false (default): bot accepts only TELEGRAM_CHAT_ID — single-user mode.
+    # Set to "true" to allow any Telegram user to onboard. Requires removing allowed_chat_id filter.
+    # Known bottleneck at scale: profile_json single column, no concurrent write protection.
+    # Production path: separate profiles table + proper auth. See docs/discovery/core-differentiators.md.
+    multi_user_enabled: bool = False
 
 
 class ConfigError(Exception):
@@ -96,4 +101,5 @@ def load_settings() -> Settings:
         rss_poll_interval=int(_optional("RSS_POLL_INTERVAL", "60")),
         agent_mode=_optional("AGENT_MODE", "production"),
         default_skill_type=_optional("DEFAULT_SKILL_TYPE", "pm"),
+        multi_user_enabled=_optional("MULTI_USER_ENABLED", "false").lower() == "true",
     )

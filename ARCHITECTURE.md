@@ -175,8 +175,24 @@ vacancies/
 
 ---
 
+## Известные упрощения (production bottlenecks)
+
+Намеренные trade-off'ы, принятые для скорости разработки. Требуют замены перед реальной нагрузкой.
+
+| Упрощение | Где | Production-путь |
+|-----------|-----|----------------|
+| `profile_json TEXT` в таблице `users` | `db/schema.sql` | Отдельная таблица `profiles` с историей версий |
+| `MULTI_USER_ENABLED=false` (single-user mode) | `core/settings.py` | `=true` убирает фильтр `allowed_chat_id`; при настоящем масштабе — auth middleware |
+| Нет concurrent write protection на profile | `db/database.py` | Optimistic locking или очередь записи |
+| FSM-состояние onboarding в `users.onboarding_step` | `db/schema.sql` | Redis или выделенная FSM-таблица |
+
+Подробнее — `docs/discovery/core-differentiators.md`.
+
+---
+
 ## Связанные документы
 
 - `docs/local-app.md` — детали Режима 4 (diagrams, команды, профиль)
 - `docs/delivery/PIVOT-PLAN.md` — план фаз разработки
 - `BACKLOG.md` — статус эпиков
+- `docs/discovery/core-differentiators.md` — конкурентные преимущества, требующие отдельного дизайна

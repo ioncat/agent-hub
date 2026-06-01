@@ -14,7 +14,13 @@ CREATE TABLE IF NOT EXISTS users (
     telegram_chat_id INTEGER UNIQUE,              -- NULL allowed for local/API-only users
     name             TEXT    NOT NULL DEFAULT '',
     skill_type       TEXT    NOT NULL DEFAULT 'pm', -- 'pm' | 'generic'
+    profile_json     TEXT,                        -- synthesised profile (JSON); NULL until onboarding complete
+    onboarding_step  TEXT,                        -- FSM resume point: NULL | 'awaiting_name' | 'awaiting_skill' | 'awaiting_pdf' | 'interview' | 'done'
     created_at       TEXT    NOT NULL DEFAULT (datetime('now'))
+    -- NOTE: profile_json stored as single column for simplicity.
+    -- Known trade-off: no versioning, single-writer per user.
+    -- Production path: extract to separate `profiles` table with history.
+    -- See docs/discovery/core-differentiators.md — "Profile Storage".
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_telegram ON users (telegram_chat_id);

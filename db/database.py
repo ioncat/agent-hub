@@ -57,6 +57,9 @@ async def init_db() -> None:
             # Multi-user: user_id FK (nullable — existing rows remain valid, NULL = user_id=1)
             "ALTER TABLE vacancies ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
             "ALTER TABLE llm_usage ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
+            # EPIC-17: onboarding profile storage
+            "ALTER TABLE users ADD COLUMN profile_json TEXT",
+            "ALTER TABLE users ADD COLUMN onboarding_step TEXT",
         ]:
             try:
                 await db.execute(migration)
@@ -172,6 +175,36 @@ async def update_user_skill_type(user_id: int, skill_type: str) -> None:
         await db.execute(
             "UPDATE users SET skill_type = ? WHERE id = ?",
             (skill_type, user_id),
+        )
+        await db.commit()
+
+
+async def update_user_profile(user_id: int, profile_json: str) -> None:
+    """Store synthesised onboarding profile (JSON string) for a user."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE users SET profile_json = ? WHERE id = ?",
+            (profile_json, user_id),
+        )
+        await db.commit()
+
+
+async def get_user_profile(user_id: int) -> str | None:
+    """Return profile_json string for a user, or None if not yet onboarded."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT profile_json FROM users WHERE id = ?", (user_id,)
+        )
+        row = await cursor.fetchone()
+        return row["profile_json"] if row else None
+
+
+async def update_user_onboarding_step(user_id: int, step: str | None) -> None:
+    """Set FSM resume checkpoint. Pass None to clear after onboarding completes."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE users SET onboarding_step = ? WHERE id = ?",
+            (step, user_id),
         )
         await db.commit()
 
