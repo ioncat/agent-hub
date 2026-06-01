@@ -41,7 +41,7 @@
 
 ### 🟡 Contract Tests
 - [x] `tests/test_parser_adapter.py` — ParserAdapter: mock httpx, test parse/error/health paths
-- [ ] `tests/test_cv_adapter.py` — CVAdapter: mock subprocess/httpx, test pdf/error paths (before + after EPIC-14)
+- [x] `tests/test_cv_adapter.py` — CVAdapter: mock httpx, happy path/error/network/construction (11 tests)
 
 ### 🟡 End-to-end pipeline verification
 - [ ] Run `cv_generate` (Phase 3 + 3.5) on vacancy #47 via e2e_test.py

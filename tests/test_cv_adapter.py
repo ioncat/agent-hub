@@ -152,3 +152,31 @@ async def test_generate_pdf_timeout_raises(tmp_path):
     with patch("adapters.cv_adapter.httpx.AsyncClient", return_value=ctx):
         with pytest.raises(CVAdapterError, match="timed out"):
             await _adapter().generate_pdf(md)
+
+
+@pytest.mark.asyncio
+async def test_generate_pdf_generic_http_error_raises(tmp_path):
+    md = tmp_path / "CV.md"
+    md.write_text("# CV", encoding="utf-8")
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(side_effect=httpx.HTTPError("generic"))
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=mock_client)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("adapters.cv_adapter.httpx.AsyncClient", return_value=ctx):
+        with pytest.raises(CVAdapterError, match="HTTP error"):
+            await _adapter().generate_pdf(md)
+
+
+# ── CVAdapter construction ────────────────────────────────────────────────────
+
+def test_trailing_slash_stripped():
+    adapter = CVAdapter(pdf_service_url="http://localhost:8002/")
+    assert adapter._url == "http://localhost:8002"
+
+
+def test_default_url_contains_port():
+    adapter = CVAdapter()
+    assert "8002" in adapter._url
