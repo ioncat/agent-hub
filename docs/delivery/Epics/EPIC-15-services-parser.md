@@ -1,6 +1,6 @@
 # EPIC-15 — services/parser/ — Own the job board parser
 
-**Status:** 📋 Planned
+**Status:** ✅ Done (2026-06-01)
 **Phase:** Phase 3 of PIVOT-PLAN
 **Priority:** P0 — Foundation
 **Last updated:** 2026-06-01
@@ -67,9 +67,9 @@ So that the system has no external repo dependency for URL fetching and dead cod
 
 | # | Task | Status |
 |---|------|--------|
-| 1 | Copy + strip `crawler.py` → `services/parser/crawler.py` | 📋 |
-| 2 | Copy + strip `config.py` → `services/parser/config.py` (djinni + dou only) | 📋 |
-| 3 | Copy `api.py` → `services/parser/app.py` | 📋 |
-| 4 | `services/parser/requirements.txt` + `Dockerfile` | 📋 |
-| 5 | `docker-compose.yml` — update build context | 📋 |
-| 6 | e2e verify: real DOU URL fetches via internal service | 📋 |
+| 1 | Copy + strip `crawler.py` → `services/parser/crawler.py` | ✅ Done |
+| 2 | Copy + strip `config.py` → `services/parser/config.py` (djinni + dou only) | ✅ Done |
+| 3 | Copy `api.py` → `services/parser/app.py` | ✅ Done |
+| 4 | `services/parser/requirements.txt` + `Dockerfile` | ✅ Done |
+| 5 | `docker-compose.yml` — update build context | ✅ Done |
+| 6 | e2e verify: real DOU URL fetches via internal service | ✅ Done |
