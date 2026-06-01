@@ -21,11 +21,11 @@ So that the system has no external repo dependency for URL fetching and dead cod
 
 **Given** a Djinni or DOU vacancy URL
 **When** `cv_fetch_jd` requests a parse
-**Then** `KMPAdapter` hits `services/parser/` (internal) and returns clean Markdown — behaviour identical to external kmp-service
+**Then** `ParserAdapter` hits `services/parser/` (internal) and returns clean Markdown — behaviour identical to external jd-parser
 
 **Given** `docker compose up`
 **When** all services start
-**Then** `kmp-service` builds from `./services/parser/` — no reference to `../knowledge-mirror-parser`
+**Then** `jd-parser` builds from `./services/parser/` — no reference to `../knowledge-mirror-parser`
 
 **Given** the stripped service source
 **When** counting files vs original knowledge-mirror-parser
@@ -35,7 +35,7 @@ So that the system has no external repo dependency for URL fetching and dead cod
 
 ## Edge Cases
 
-- URL not matching known site configs → parser returns 404 / empty → `KMPAdapter` raises `ParseError`
+- URL not matching known site configs → parser returns 404 / empty → `ParserAdapter` raises `ParseError`
 - Site temporarily returns 429 / 503 → retry logic in `crawler.py` handles it (existing)
 
 ---
@@ -52,7 +52,7 @@ So that the system has no external repo dependency for URL fetching and dead cod
 
 - Keep: `api.py` → `services/parser/app.py`, `crawler.py` (fetch/session/headers/delay only), `config.py` (djinni + dou only)
 - Cut: `database.py`, `processor.py`, `main.py`, `discover_urls()`, `_parse_sitemap_xml()`, `login()`, `download_binary()`, gopractice config
-- `KMPAdapter` unchanged — HTTP contract `POST /parse` stays identical
+- `ParserAdapter` unchanged — HTTP contract `POST /parse` stays identical
 - `docker-compose.yml`: update build context `../knowledge-mirror-parser` → `./services/parser`
 
 ---

@@ -11,7 +11,7 @@ Does NOT send Telegram messages — prints output to stdout.
 
 Requires:
     - .env with ANTHROPIC_API_KEY (and AGENT_MODE=testing for confirmation)
-    - kmp-service on KMP_BASE_URL for --url mode (default http://localhost:8001)
+    - jd-parser on PARSER_URL for --url mode (default http://localhost:8001)
     - DB at DB_PATH (default db/agent.db)
 
 Usage:

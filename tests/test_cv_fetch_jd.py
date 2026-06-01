@@ -88,9 +88,9 @@ def test_url_slug_empty_path():
 @pytest.mark.asyncio
 async def test_fetch_jd_saves_file(tmp_path):
     doc = _make_doc()
-    kmp = AsyncMock()
-    kmp.fetch_markdown = AsyncMock(return_value=doc)
-    ctx = _make_ctx(tmp_path, kmp)
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    ctx = _make_ctx(tmp_path, parser)
 
     with patch("tools.cv_fetch_jd.database") as mock_db:
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
@@ -113,9 +113,9 @@ async def test_fetch_jd_saves_file(tmp_path):
 @pytest.mark.asyncio
 async def test_fetch_jd_correct_folder_structure(tmp_path):
     doc = _make_doc()
-    kmp = AsyncMock()
-    kmp.fetch_markdown = AsyncMock(return_value=doc)
-    ctx = _make_ctx(tmp_path, kmp)
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    ctx = _make_ctx(tmp_path, parser)
 
     with patch("tools.cv_fetch_jd.database") as mock_db:
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
@@ -134,9 +134,9 @@ async def test_fetch_jd_correct_folder_structure(tmp_path):
 @pytest.mark.asyncio
 async def test_fetch_jd_calls_db_insert(tmp_path):
     doc = _make_doc(title="Python Dev")
-    kmp = AsyncMock()
-    kmp.fetch_markdown = AsyncMock(return_value=doc)
-    ctx = _make_ctx(tmp_path, kmp)
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    ctx = _make_ctx(tmp_path, parser)
 
     with patch("tools.cv_fetch_jd.database") as mock_db:
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
@@ -175,15 +175,15 @@ async def test_fetch_jd_duplicate_returns_existing(tmp_path):
     ctx.deps.parser_adapter.fetch_markdown.assert_not_called()
 
 
-# ── cv_fetch_jd — kmp error ───────────────────────────────────────────────────
+# ── cv_fetch_jd — parser error ──────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_fetch_jd_kmp_error_returns_message(tmp_path):
-    kmp = AsyncMock()
-    kmp.fetch_markdown = AsyncMock(
+async def test_fetch_jd_parser_error_returns_message(tmp_path):
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(
         side_effect=ParserError("fetch failed", url="https://djinni.co/jobs/999/", status_code=503)
     )
-    ctx = _make_ctx(tmp_path, kmp)
+    ctx = _make_ctx(tmp_path, parser)
 
     with patch("tools.cv_fetch_jd.database") as mock_db:
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
@@ -199,9 +199,9 @@ async def test_fetch_jd_kmp_error_returns_message(tmp_path):
 @pytest.mark.asyncio
 async def test_fetch_jd_empty_markdown_returns_warning(tmp_path):
     doc = ParsedDocument(title="Job", markdown="   ", source_url="https://djinni.co/jobs/1/")
-    kmp = AsyncMock()
-    kmp.fetch_markdown = AsyncMock(return_value=doc)
-    ctx = _make_ctx(tmp_path, kmp)
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    ctx = _make_ctx(tmp_path, parser)
 
     with patch("tools.cv_fetch_jd.database") as mock_db:
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
@@ -218,9 +218,9 @@ async def test_fetch_jd_empty_markdown_returns_warning(tmp_path):
 async def test_fetch_jd_path_scoped_to_user_id(tmp_path):
     """Vacancy folder must be under vacancies/{user_id}/..."""
     doc = _make_doc()
-    kmp = AsyncMock()
-    kmp.fetch_markdown = AsyncMock(return_value=doc)
-    ctx = _make_ctx(tmp_path, kmp, user_id=7)
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    ctx = _make_ctx(tmp_path, parser, user_id=7)
 
     with patch("tools.cv_fetch_jd.database") as mock_db:
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
@@ -239,9 +239,9 @@ async def test_fetch_jd_path_scoped_to_user_id(tmp_path):
 async def test_fetch_jd_passes_user_id_to_db(tmp_path):
     """insert_vacancy must receive user_id from AgentDeps."""
     doc = _make_doc()
-    kmp = AsyncMock()
-    kmp.fetch_markdown = AsyncMock(return_value=doc)
-    ctx = _make_ctx(tmp_path, kmp, user_id=42)
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    ctx = _make_ctx(tmp_path, parser, user_id=42)
 
     with patch("tools.cv_fetch_jd.database") as mock_db:
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
@@ -259,9 +259,9 @@ async def test_fetch_jd_passes_user_id_to_db(tmp_path):
 async def test_fetch_jd_processes_queued_vacancy(tmp_path):
     """When existing vacancy has status='queued', proceed with fetch and update fields."""
     doc = _make_doc(title="Queued PM Role")
-    kmp = AsyncMock()
-    kmp.fetch_markdown = AsyncMock(return_value=doc)
-    ctx = _make_ctx(tmp_path, kmp, user_id=1)
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    ctx = _make_ctx(tmp_path, parser, user_id=1)
 
     queued_row = MagicMock()
     queued_row.__getitem__ = lambda self, key: {

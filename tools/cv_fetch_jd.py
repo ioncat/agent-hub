@@ -1,7 +1,7 @@
 """
 tools/cv_fetch_jd.py — fetch and save a job description from a URL.
 
-Pipeline step 0: URL → kmp-service → JD.md on disk + vacancy row in SQLite.
+Pipeline step 0: URL → jd-parser → JD.md on disk + vacancy row in SQLite.
 
 Tool registered in agent.py via ToolRegistry.
 Receives shared dependencies via RunContext[AgentDeps].
