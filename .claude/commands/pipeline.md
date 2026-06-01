@@ -32,7 +32,9 @@ Run the career-agent pipeline for: $ARGUMENTS
 
 ## Шаг 2 — Phase 1 + 2: Fetch + Analyze
 
-Запусти **сразу, без подтверждения**:
+Спроси: **"Запускаем fetch + analyze?"**
+
+После подтверждения — передай флаг `--auto-confirm` (ты уже получил разрешение пользователя):
 
 ```bash
 # URL режим
@@ -40,21 +42,24 @@ python scripts/e2e_test.py \
   --url "$ARGUMENTS" \
   --phase fetch,analyze \
   --user-id {selected_user_id} \
-  --profile skill/users/{selected_user_id}/PROFILE.md
+  --profile skill/users/{selected_user_id}/PROFILE.md \
+  --auto-confirm
 
 # File режим
 python scripts/e2e_test.py \
   --file "$ARGUMENTS" \
   --phase fetch,analyze \
   --user-id {selected_user_id} \
-  --profile skill/users/{selected_user_id}/PROFILE.md
+  --profile skill/users/{selected_user_id}/PROFILE.md \
+  --auto-confirm
 
 # ID режим — только analyze (fetch пропущен)
 python scripts/e2e_test.py \
   --id "$ARGUMENTS" \
   --phase analyze \
   --user-id {selected_user_id} \
-  --profile skill/users/{selected_user_id}/PROFILE.md
+  --profile skill/users/{selected_user_id}/PROFILE.md \
+  --auto-confirm
 ```
 
 После выполнения:
@@ -91,7 +96,8 @@ python scripts/e2e_test.py \
   --id {vacancy_id} \
   --phase generate \
   --user-id {selected_user_id} \
-  --profile skill/users/{selected_user_id}/PROFILE.md
+  --profile skill/users/{selected_user_id}/PROFILE.md \
+  --auto-confirm
 ```
 
 После выполнения:
@@ -102,7 +108,7 @@ python scripts/e2e_test.py \
 
 - Если правки → прими правки текстом, внеси в файл `[Name]_CV.md`, перегенерируй PDF:
   ```bash
-  python scripts/e2e_test.py --id {vacancy_id} --phase generate --user-id {selected_user_id} ...
+  python scripts/e2e_test.py --id {vacancy_id} --phase generate --user-id {selected_user_id} --profile skill/users/{selected_user_id}/PROFILE.md --auto-confirm
   ```
 - Если ок → спроси: **"Переходим к cover?"**
 
@@ -115,7 +121,8 @@ python scripts/e2e_test.py \
   --id {vacancy_id} \
   --phase cover \
   --user-id {selected_user_id} \
-  --profile skill/users/{selected_user_id}/PROFILE.md
+  --profile skill/users/{selected_user_id}/PROFILE.md \
+  --auto-confirm
 ```
 
 После выполнения:

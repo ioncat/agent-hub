@@ -101,6 +101,31 @@ async def insert_user(
         return cursor.lastrowid  # type: ignore[return-value]
 
 
+async def upsert_user(
+    user_id: int,
+    name: str,
+    skill_type: str = "pm",
+) -> None:
+    """Insert or update a user by explicit id.
+
+    Used by local /pipeline to sync users from skill/users.yaml into DB.
+    Any entry point (Telegram onboarding, admin script, web UI) can call this.
+    On conflict: updates name and skill_type, preserves telegram_chat_id and created_at.
+    """
+    async with get_db() as db:
+        await db.execute(
+            """
+            INSERT INTO users (id, name, skill_type)
+            VALUES (?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                name       = excluded.name,
+                skill_type = excluded.skill_type
+            """,
+            (user_id, name, skill_type),
+        )
+        await db.commit()
+
+
 async def get_user_by_id(user_id: int) -> aiosqlite.Row | None:
     """Return user row by id or None."""
     async with get_db() as db:

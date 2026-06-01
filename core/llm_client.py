@@ -131,12 +131,14 @@ class ClaudeProvider:
         profile_md: str,
         max_tokens: int = 4096,
         testing_mode: bool = False,
+        auto_confirm: bool = False,
     ) -> None:
         self._client = anthropic.AsyncAnthropic(api_key=api_key)
         self._model = model
         self._profile_md = profile_md
         self._max_tokens = max_tokens
         self._testing_mode = testing_mode
+        self._auto_confirm = auto_confirm
         # ── Session token counters (reset on each ClaudeProvider instance) ───
         self._sess_calls = 0
         self._sess_input = 0
@@ -164,6 +166,9 @@ class ClaudeProvider:
             f"   user_len={len(user)} chars",
             flush=True,
         )
+        if self._auto_confirm:
+            print("   Auto-confirmed by pipeline orchestrator.", flush=True)
+            return True
         answer = await asyncio.get_event_loop().run_in_executor(
             None, lambda: input("   Proceed? [y/N]: ").strip().lower()
         )

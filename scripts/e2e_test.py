@@ -60,6 +60,24 @@ class _Ctx:
     deps: AgentDeps
 
 
+def _sync_user_from_yaml(user_id: int) -> tuple[str, str] | None:
+    """Read skill/users.yaml and return (name, skill_type) for user_id, or None."""
+    yaml_path = _ROOT / "skill" / "users.yaml"
+    if not yaml_path.exists():
+        return None
+    try:
+        import yaml  # type: ignore[import]
+    except ImportError:
+        return None
+    data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
+    for u in data.get("users", []):
+        if int(u.get("id", -1)) == user_id:
+            name = u.get("name", f"User {user_id}")
+            skill_type = u.get("skill_type", "pm")
+            return name, skill_type
+    return None
+
+
 async def run_e2e(
     url: str | None,
     phases: list[str],
@@ -67,6 +85,7 @@ async def run_e2e(
     vacancy_id: int | None = None,
     user_id: int = 1,
     profile_path: Path | None = None,
+    auto_confirm: bool = False,
 ) -> None:
     # Determine mode label for display
     if file_path:
@@ -99,6 +118,15 @@ async def run_e2e(
     database.configure(settings.db_path)
     await database.init_db()
 
+    # Sync user from skill/users.yaml → DB (upsert — safe to call every run)
+    user_info = _sync_user_from_yaml(user_id)
+    if user_info:
+        name, skill_type_from_yaml = user_info
+        await database.upsert_user(user_id, name=name, skill_type=skill_type_from_yaml)
+        print(f"  User sync   : #{user_id} {name!r} (skill_type={skill_type_from_yaml})\n")
+    else:
+        print(f"  User sync   : skill/users.yaml not found or user #{user_id} not listed\n")
+
     # Profile: --profile arg overrides PROFILE_MD_PATH from settings
     effective_profile_path = profile_path or settings.profile_md_path
     if not effective_profile_path.exists():
@@ -113,6 +141,7 @@ async def run_e2e(
         profile_md=profile_md,
         max_tokens=settings.max_tokens,
         testing_mode=(settings.agent_mode == "testing"),
+        auto_confirm=auto_confirm,
     )
 
     kmp = KMPAdapter(base_url=settings.kmp_base_url)
@@ -265,6 +294,8 @@ Examples:
                         help="career-agent DB user_id (default: 1)")
     parser.add_argument("--profile", default=None, metavar="PATH",
                         help="Path to PROFILE.md (overrides PROFILE_MD_PATH from .env)")
+    parser.add_argument("--auto-confirm", dest="auto_confirm", action="store_true",
+                        help="Auto-confirm all testing-mode API prompts (use only after explicit user approval)")
     parser.add_argument(
         "--phase",
         default=None,
@@ -293,6 +324,7 @@ Examples:
         vacancy_id=args.vacancy_id,
         user_id=args.user_id,
         profile_path=profile_path,
+        auto_confirm=args.auto_confirm,
     ))
 
 
