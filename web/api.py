@@ -42,23 +42,44 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Agent Hub Tracker", lifespan=lifespan)
+app = FastAPI(title="Career Agent Tracker", lifespan=lifespan)
 
 
 @app.get("/", response_class=HTMLResponse)
-async def tracker_page(request: Request, status: str | None = None, limit: int = 200):
-    rows = await database.list_vacancies(status=status, limit=limit)
+async def tracker_page(
+    request: Request,
+    status: str | None = None,
+    user_id: int | None = None,
+    limit: int = 200,
+):
+    rows = await database.list_vacancies(status=status, user_id=user_id, limit=limit)
     vacancies = [build_vacancy_view(row, _CANDIDATE_NAME) for row in rows]
+    users = await database.list_users()
     return _TEMPLATES.TemplateResponse(
         request=request,
         name="tracker.html",
-        context={"vacancies": vacancies, "total": len(vacancies)},
+        context={
+            "vacancies": vacancies,
+            "total": len(vacancies),
+            "users": [dict(u) for u in users],
+            "selected_user_id": user_id,
+        },
     )
 
 
 @app.get("/api/vacancies")
-async def api_vacancies(status: str | None = None, limit: int = 200):
-    rows = await database.list_vacancies(status=status, limit=limit)
+async def api_vacancies(
+    status: str | None = None,
+    user_id: int | None = None,
+    limit: int = 200,
+):
+    rows = await database.list_vacancies(status=status, user_id=user_id, limit=limit)
+    return [dict(row) for row in rows]
+
+
+@app.get("/api/users")
+async def api_users():
+    rows = await database.list_users()
     return [dict(row) for row in rows]
 
 

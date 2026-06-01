@@ -1,0 +1,89 @@
+"""
+tests/test_web_api.py — contract tests for web/api.py endpoints.
+
+Tests user_id filter on GET / and GET /api/vacancies, plus GET /api/users.
+Uses FastAPI TestClient + real temp DB (no mocks).
+
+Run: python -m pytest tests/test_web_api.py -v
+"""
+
+import pytest
+import pytest_asyncio
+from fastapi.testclient import TestClient
+
+from db import database
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def temp_db(tmp_path, monkeypatch):
+    """Point web/api.py and database module at a fresh temp DB."""
+    db_path = tmp_path / "test.db"
+    database.configure(db_path)
+    await database.init_db()
+    # Patch the env var read in web/api.py lifespan so it uses the same DB path
+    monkeypatch.setenv("DB_PATH", str(db_path))
+    yield
+
+
+@pytest.fixture()
+def client(tmp_path):
+    """FastAPI TestClient with lifespan."""
+    import os
+    os.environ.setdefault("DB_PATH", str(tmp_path / "test.db"))
+    from web.api import app
+    with TestClient(app, raise_server_exceptions=True) as c:
+        yield c
+
+
+# ── GET /api/users ─────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_api_users_returns_list(client):
+    """GET /api/users returns list of users (may be empty on fresh DB)."""
+    await database.insert_user(name="Alice", telegram_chat_id=1001, skill_type="pm")
+    await database.insert_user(name="Bob", telegram_chat_id=1002, skill_type="generic")
+
+    resp = client.get("/api/users")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 2
+    names = {u["name"] for u in data}
+    assert names == {"Alice", "Bob"}
+
+
+# ── GET /api/vacancies?user_id=N ──────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_api_vacancies_filter_by_user_id(client):
+    """GET /api/vacancies?user_id=N returns only that user's vacancies."""
+    uid1 = await database.insert_user(name="Alice", telegram_chat_id=2001, skill_type="pm")
+    uid2 = await database.insert_user(name="Bob", telegram_chat_id=2002, skill_type="generic")
+
+    await database.insert_vacancy(url="https://djinni.co/jobs/1/", user_id=uid1)
+    await database.insert_vacancy(url="https://djinni.co/jobs/2/", user_id=uid1)
+    await database.insert_vacancy(url="https://djinni.co/jobs/3/", user_id=uid2)
+
+    resp1 = client.get(f"/api/vacancies?user_id={uid1}")
+    assert resp1.status_code == 200
+    assert len(resp1.json()) == 2
+
+    resp2 = client.get(f"/api/vacancies?user_id={uid2}")
+    assert resp2.status_code == 200
+    assert len(resp2.json()) == 1
+
+    resp_all = client.get("/api/vacancies")
+    assert resp_all.status_code == 200
+    assert len(resp_all.json()) == 3
+
+
+# ── GET /?user_id=N (tracker page) ────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_tracker_page_user_id_filter(client):
+    """GET /?user_id=N returns HTML and does not raise."""
+    uid = await database.insert_user(name="Alice", telegram_chat_id=3001, skill_type="pm")
+    await database.insert_vacancy(url="https://djinni.co/jobs/10/", user_id=uid)
+
+    resp = client.get(f"/?user_id={uid}")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]

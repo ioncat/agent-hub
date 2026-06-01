@@ -17,13 +17,14 @@ from tools.cv_fetch_jd import _detect_site, _url_slug, cv_fetch_jd
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _make_ctx(tmp_path: Path, kmp_adapter=None) -> MagicMock:
+def _make_ctx(tmp_path: Path, kmp_adapter=None, user_id: int = 1) -> MagicMock:
     """Build a mock RunContext[AgentDeps]."""
     if kmp_adapter is None:
         kmp_adapter = AsyncMock()
     ctx = MagicMock()
     ctx.deps.kmp_adapter = kmp_adapter
     ctx.deps.vacancies_path = tmp_path / "vacancies"
+    ctx.deps.user_id = user_id
     return ctx
 
 
@@ -124,7 +125,8 @@ async def test_fetch_jd_correct_folder_structure(tmp_path):
 
     saved = list(ctx.deps.vacancies_path.rglob("JD.md"))
     path_parts = saved[0].parts
-    # site = djinni, month = YYYY-MM, slug in path
+    # path: vacancies/{user_id}/{site}/{YYYY-MM}/{slug}/JD.md
+    assert "1" in path_parts        # user_id segment
     assert "djinni" in path_parts
     assert "123-backend" in path_parts
 
@@ -147,6 +149,7 @@ async def test_fetch_jd_calls_db_insert(tmp_path):
     assert call_kwargs["url"] == "https://djinni.co/jobs/456-python/"
     assert call_kwargs["title"] == "Python Dev"
     assert call_kwargs["site"] == "djinni"
+    assert call_kwargs["user_id"] == 1
 
 
 # ── cv_fetch_jd — duplicate URL ───────────────────────────────────────────────
@@ -207,3 +210,44 @@ async def test_fetch_jd_empty_markdown_returns_warning(tmp_path):
 
     assert "⚠️" in result
     assert "извлечь текст" in result
+
+
+# ── cv_fetch_jd — user-scoped filesystem path ─────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_fetch_jd_path_scoped_to_user_id(tmp_path):
+    """Vacancy folder must be under vacancies/{user_id}/..."""
+    doc = _make_doc()
+    kmp = AsyncMock()
+    kmp.fetch_markdown = AsyncMock(return_value=doc)
+    ctx = _make_ctx(tmp_path, kmp, user_id=7)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=10)
+
+        await cv_fetch_jd(ctx, "https://djinni.co/jobs/777-senior/")
+
+    saved = list(ctx.deps.vacancies_path.rglob("JD.md"))
+    assert len(saved) == 1
+    # First directory under vacancies_path must be "7" (user_id)
+    relative = saved[0].relative_to(ctx.deps.vacancies_path)
+    assert relative.parts[0] == "7"
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_passes_user_id_to_db(tmp_path):
+    """insert_vacancy must receive user_id from AgentDeps."""
+    doc = _make_doc()
+    kmp = AsyncMock()
+    kmp.fetch_markdown = AsyncMock(return_value=doc)
+    ctx = _make_ctx(tmp_path, kmp, user_id=42)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=99)
+
+        await cv_fetch_jd(ctx, "https://djinni.co/jobs/999-test/")
+
+    call_kwargs = mock_db.insert_vacancy.call_args.kwargs
+    assert call_kwargs["user_id"] == 42

@@ -69,6 +69,12 @@
 <div class="wrap">
 <h1>Vacancy Tracker</h1>
 <div class="controls">
+  <select id="f-user" onchange="filterUser(this.value)">
+    <option value="">All users</option>
+    {% for u in users %}
+    <option value="{{ u.id }}" {% if selected_user_id == u.id %}selected{% endif %}>{{ u.name or 'User ' ~ u.id }}</option>
+    {% endfor %}
+  </select>
   <select id="f-rec" onchange="filter()">
     <option value="">All</option>
     <option value="rec-yes">✅ Подавать</option>
@@ -159,6 +165,11 @@ function sort(c){
     const exp=tb.querySelector(`tr[data-for="${r.dataset.idx}"]`);
     if(exp)tb.appendChild(exp);
   });
+}
+function filterUser(uid){
+  const url=new URL(window.location.href);
+  if(uid){url.searchParams.set('user_id',uid);}else{url.searchParams.delete('user_id');}
+  window.location.href=url.toString();
 }
 function filter(){
   const rec=document.getElementById('f-rec').value;

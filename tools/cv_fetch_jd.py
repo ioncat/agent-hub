@@ -7,7 +7,7 @@ Tool registered in agent.py via ToolRegistry.
 Receives shared dependencies via RunContext[AgentDeps].
 
 Folder layout:
-    vacancies/{site}/YYYY-MM/{slug}/JD.md
+    vacancies/{user_id}/{site}/YYYY-MM/{slug}/JD.md
 
 Usage (by PydanticAI Agent, not called directly):
     # user sends URL → router calls this tool automatically
@@ -73,7 +73,7 @@ async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
     month = datetime.now().strftime("%Y-%m")
     slug = _url_slug(url)
 
-    vacancy_dir = ctx.deps.vacancies_path / site / month / slug
+    vacancy_dir = ctx.deps.vacancies_path / str(ctx.deps.user_id) / site / month / slug
     vacancy_dir.mkdir(parents=True, exist_ok=True)
     jd_path = vacancy_dir / "JD.md"
 
@@ -91,6 +91,7 @@ async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
             title=doc.title,
             site=site,
             markdown_path=markdown_path,
+            user_id=ctx.deps.user_id,
         )
     except Exception as exc:
         # Concurrent insert race — fetch existing
