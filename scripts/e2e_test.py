@@ -65,6 +65,8 @@ async def run_e2e(
     phases: list[str],
     file_path: Path | None = None,
     vacancy_id: int | None = None,
+    user_id: int = 1,
+    profile_path: Path | None = None,
 ) -> None:
     # Determine mode label for display
     if file_path:
@@ -78,6 +80,7 @@ async def run_e2e(
     print(f"  career-agent e2e test")
     print(f"  Input  : {mode}")
     print(f"  Phases : {', '.join(phases)}")
+    print(f"  user_id: {user_id}")
     print(f"{'='*60}\n")
 
     # ── Settings & services ───────────────────────────────────────────────────
@@ -96,8 +99,13 @@ async def run_e2e(
     database.configure(settings.db_path)
     await database.init_db()
 
-    profile_md = settings.profile_md_path.read_text(encoding="utf-8")
-    print(f"  PROFILE.md  : {len(profile_md)} chars\n")
+    # Profile: --profile arg overrides PROFILE_MD_PATH from settings
+    effective_profile_path = profile_path or settings.profile_md_path
+    if not effective_profile_path.exists():
+        print(f"❌  PROFILE.md not found: {effective_profile_path}")
+        sys.exit(1)
+    profile_md = effective_profile_path.read_text(encoding="utf-8")
+    print(f"  PROFILE.md  : {effective_profile_path} ({len(profile_md)} chars)\n")
 
     llm = ClaudeProvider(
         api_key=settings.anthropic_api_key,
@@ -110,15 +118,20 @@ async def run_e2e(
     kmp = KMPAdapter(base_url=settings.kmp_base_url)
     cv_adapter = CVAdapter(pdf_service_url=settings.pdf_service_url)
 
+    # Resolve skill_type for the given user_id
+    user_row = await database.get_user_by_id(user_id)
+    skill_type = user_row["skill_type"] if user_row else settings.default_skill_type
+
     deps = AgentDeps(
         kmp_adapter=kmp,
         llm=llm,
         vacancies_path=settings.vacancies_path,
         candidate_name=settings.candidate_name,
         cv_adapter=cv_adapter,
-        user_id=1,
-        skill_type=settings.default_skill_type,
+        user_id=user_id,
+        skill_type=skill_type,
     )
+    print(f"  skill_type  : {skill_type}\n")
     ctx = _Ctx(deps=deps)
 
     # ── Resolve vacancy_id from --id mode ─────────────────────────────────────
@@ -248,6 +261,10 @@ Examples:
                        help="Path to JD .md file (skips fetch phase)")
     group.add_argument("--id", dest="vacancy_id", type=int, default=None, metavar="N",
                        help="Existing DB vacancy ID (skips fetch phase)")
+    parser.add_argument("--user-id", dest="user_id", type=int, default=1,
+                        help="career-agent DB user_id (default: 1)")
+    parser.add_argument("--profile", default=None, metavar="PATH",
+                        help="Path to PROFILE.md (overrides PROFILE_MD_PATH from .env)")
     parser.add_argument(
         "--phase",
         default=None,
@@ -267,11 +284,15 @@ Examples:
     else:
         phases = ["fetch", "analyze"]
 
+    profile_path = Path(args.profile) if args.profile else None
+
     asyncio.run(run_e2e(
         url=url,
         phases=phases,
         file_path=file_path,
         vacancy_id=args.vacancy_id,
+        user_id=args.user_id,
+        profile_path=profile_path,
     ))
 
 
