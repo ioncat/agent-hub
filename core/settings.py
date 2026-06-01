@@ -43,6 +43,7 @@ class Settings:
     seen_jobs_path: Path = field(default_factory=lambda: Path("seen_jobs.json"))
     rss_poll_interval: int = 60  # seconds between seen_jobs.json polls
     agent_mode: str = "production"  # "testing" → confirm before each LLM API call
+    default_skill_type: str = "pm"  # skill_type for default user; overridable via DEFAULT_SKILL_TYPE
 
 
 class ConfigError(Exception):
@@ -94,4 +95,5 @@ def load_settings() -> Settings:
         seen_jobs_path=Path(_optional("SEEN_JOBS_PATH", "seen_jobs.json")),
         rss_poll_interval=int(_optional("RSS_POLL_INTERVAL", "60")),
         agent_mode=_optional("AGENT_MODE", "production"),
+        default_skill_type=_optional("DEFAULT_SKILL_TYPE", "pm"),
     )

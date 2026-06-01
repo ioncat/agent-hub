@@ -105,6 +105,16 @@ async def main() -> None:
     database.configure(settings.db_path)
     await database.init_db()
 
+    # Seed default user from TELEGRAM_CHAT_ID on first run; returns existing id on subsequent runs.
+    default_user_id = await database.get_or_create_default_user(
+        telegram_chat_id=settings.telegram_chat_id,
+        name="Default User",
+        skill_type=settings.default_skill_type,
+    )
+    default_user_row = await database.get_user_by_id(default_user_id)
+    default_skill_type = default_user_row["skill_type"] if default_user_row else settings.default_skill_type
+    log.info("Default user: id=%d skill_type=%s", default_user_id, default_skill_type)
+
     # ── 3. LLM client ─────────────────────────────────────────────────────────
     if not settings.profile_md_path.exists():
         log.warning("PROFILE.md not found at %s — prompt caching disabled", settings.profile_md_path)
@@ -134,6 +144,8 @@ async def main() -> None:
         vacancies_path=settings.vacancies_path,
         candidate_name=settings.candidate_name,
         cv_adapter=cv_adapter,
+        user_id=default_user_id,
+        skill_type=default_skill_type,
     )
 
     registry = ToolRegistry()
