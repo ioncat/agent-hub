@@ -55,11 +55,11 @@ vacancies/
 └── Acme Corp — Product Manager/
     ├── JD.md                  ← JD (из URL или вставлен вручную)
     ├── JD_analysis.md         ← Phase 1 + 2 + 3.5 self-review
-    ├── Kosar_CV.md            ← английское CV
-    ├── Kosar_CV_UA.md         ← украинское CV (если запрошено)
-    ├── Kosar_CV.pdf           ← PDF
-    ├── Kosar_Cover.md         ← cover (английский)
-    └── Kosar_Cover_UA.md      ← cover (украинский, если запрошено)
+    ├── [Name]_CV.md           ← английское CV
+    ├── [Name]_CV_UA.md        ← украинское CV (если запрошено)
+    ├── [Name]_CV.pdf          ← PDF
+    ├── [Name]_Cover.md        ← cover (английский)
+    └── [Name]_Cover_UA.md     ← cover (украинский, если запрошено)
 ```
 
 ---
