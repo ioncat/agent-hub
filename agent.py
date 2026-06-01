@@ -116,12 +116,23 @@ async def main() -> None:
     log.info("Default user: id=%d skill_type=%s", default_user_id, default_skill_type)
 
     # ── 3. LLM client ─────────────────────────────────────────────────────────
-    if not settings.profile_md_path.exists():
-        log.warning("PROFILE.md not found at %s — prompt caching disabled", settings.profile_md_path)
-        profile_md = "# PROFILE\n(not loaded)"
-    else:
+    # EPIC-17: load profile from DB first; fall back to PROFILE.md file if DB profile is empty.
+    # When a user completes onboarding, their profile_json replaces the file-based profile.
+    # PROFILE_MD_PATH setting is a deprecated fallback — remove after all users are onboarded.
+    from tools.cv_onboard import get_profile_for_llm
+    profile_md = await get_profile_for_llm(default_user_id)
+
+    # Fallback: if DB profile is the "not yet created" stub, try the file
+    if "not yet created" in profile_md and settings.profile_md_path.exists():
         profile_md = settings.profile_md_path.read_text(encoding="utf-8")
-        log.info("PROFILE.md loaded (%d chars)", len(profile_md))
+        log.info("Profile loaded from file (DB empty, fallback) (%d chars)", len(profile_md))
+    elif "not yet created" in profile_md:
+        log.warning(
+            "No profile in DB and PROFILE.md not found at %s — pipeline will run with degraded profile",
+            settings.profile_md_path,
+        )
+    else:
+        log.info("Profile loaded from DB for user_id=%d (%d chars)", default_user_id, len(profile_md))
 
     llm = ClaudeProvider(
         api_key=settings.anthropic_api_key,

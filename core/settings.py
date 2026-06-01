@@ -2,8 +2,12 @@
 core/settings.py — application config loaded from env vars.
 
 Required vars: ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
-Optional vars (have defaults): LLM_MODEL, PROFILE_MD_PATH, DB_PATH, PARSER_URL,
+Optional vars (have defaults): LLM_MODEL, DB_PATH, PARSER_URL,
                                CANDIDATE_NAME, PDF_SERVICE_URL, MULTI_USER_ENABLED
+Deprecated (still functional as fallback): PROFILE_MD_PATH
+  — EPIC-17: profile now loaded from DB (users.profile_json).
+    PROFILE_MD_PATH is used only when DB profile is empty (new install / not yet onboarded).
+    Will be removed after production rollout of Telegram onboarding.
 
 Fails fast on startup if required vars are missing — never starts in broken state.
 
