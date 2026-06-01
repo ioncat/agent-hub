@@ -7,7 +7,7 @@ Startup sequence:
 3. Build ClaudeProvider (loads PROFILE.md for prompt caching)
 4. Build ToolRegistry + register domain tools
 5. Build Router (PydanticAI Agent)
-6. Build TelegramBot
+6. Build TelegramBot (with FSM onboarding + MULTI_USER_ENABLED flag)
 7. Start long polling (blocks until Ctrl-C or SIGTERM)
 
 Run:
@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 from adapters.cv_adapter import CVAdapter
-from adapters.kmp_adapter import KMPAdapter
+from adapters.parser_adapter import ParserAdapter
 from core.deps import AgentDeps
 from core.rss_watcher import RSSWatcher
 from core.settings import ConfigError, load_settings
@@ -136,10 +136,10 @@ async def main() -> None:
     # ── 4. Tools + deps ──────────────────────────────────────────────────────
     settings.vacancies_path.mkdir(parents=True, exist_ok=True)
 
-    kmp_adapter = KMPAdapter(base_url=settings.kmp_base_url)
+    parser_adapter = ParserAdapter(base_url=settings.parser_url)
     cv_adapter = CVAdapter(pdf_service_url=settings.pdf_service_url)
     deps = AgentDeps(
-        kmp_adapter=kmp_adapter,
+        parser_adapter=parser_adapter,
         llm=llm,
         vacancies_path=settings.vacancies_path,
         candidate_name=settings.candidate_name,
@@ -164,6 +164,8 @@ async def main() -> None:
         token=settings.telegram_token,
         allowed_chat_id=settings.telegram_chat_id,
         on_message=router.handle,
+        multi_user_enabled=settings.multi_user_enabled,
+        default_user_id=default_user_id,
     )
 
     # ── 7. RSS Watcher ────────────────────────────────────────────────────────
