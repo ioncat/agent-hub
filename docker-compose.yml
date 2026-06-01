@@ -17,10 +17,10 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # ── knowledge-mirror-parser — URL → Markdown ───────────────────────────────
+  # ── parser — job board URL → Markdown ────────────────────────────────────
   kmp-service:
     build:
-      context: ../knowledge-mirror-parser
+      context: ./services/parser
       dockerfile: Dockerfile
     ports:
       - "8001:8001"
