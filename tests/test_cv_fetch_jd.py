@@ -1,8 +1,8 @@
 """
 tests/test_cv_fetch_jd.py — tests for tools/cv_fetch_jd.py.
 
-Mocks: KMPAdapter, database functions, filesystem (tmp_path).
-No real kmp-service or DB needed.
+Mocks: ParserAdapter, database functions, filesystem (tmp_path).
+No real jd-parser service or DB needed.
 """
 
 from pathlib import Path
@@ -10,19 +10,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from adapters.kmp_adapter import KMPError
+from adapters.parser_adapter import ParserError
 from contracts.parsed_document import ParsedDocument
 from tools.cv_fetch_jd import _detect_site, _url_slug, cv_fetch_jd
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _make_ctx(tmp_path: Path, kmp_adapter=None, user_id: int = 1) -> MagicMock:
+def _make_ctx(tmp_path: Path, parser_adapter=None, user_id: int = 1) -> MagicMock:
     """Build a mock RunContext[AgentDeps]."""
-    if kmp_adapter is None:
-        kmp_adapter = AsyncMock()
+    if parser_adapter is None:
+        parser_adapter = AsyncMock()
     ctx = MagicMock()
-    ctx.deps.kmp_adapter = kmp_adapter
+    ctx.deps.parser_adapter = parser_adapter
     ctx.deps.vacancies_path = tmp_path / "vacancies"
     ctx.deps.user_id = user_id
     return ctx
@@ -172,7 +172,7 @@ async def test_fetch_jd_duplicate_returns_existing(tmp_path):
 
     assert "ℹ️" in result
     assert "уже в базе" in result
-    ctx.deps.kmp_adapter.fetch_markdown.assert_not_called()
+    ctx.deps.parser_adapter.fetch_markdown.assert_not_called()
 
 
 # ── cv_fetch_jd — kmp error ───────────────────────────────────────────────────
@@ -181,7 +181,7 @@ async def test_fetch_jd_duplicate_returns_existing(tmp_path):
 async def test_fetch_jd_kmp_error_returns_message(tmp_path):
     kmp = AsyncMock()
     kmp.fetch_markdown = AsyncMock(
-        side_effect=KMPError("fetch failed", url="https://djinni.co/jobs/999/", status_code=503)
+        side_effect=ParserError("fetch failed", url="https://djinni.co/jobs/999/", status_code=503)
     )
     ctx = _make_ctx(tmp_path, kmp)
 
@@ -304,4 +304,4 @@ async def test_fetch_jd_non_queued_duplicate_skips_fetch(tmp_path):
         result = await cv_fetch_jd(ctx, "https://djinni.co/jobs/10/")
 
     assert "ℹ️" in result
-    ctx.deps.kmp_adapter.fetch_markdown.assert_not_called()
+    ctx.deps.parser_adapter.fetch_markdown.assert_not_called()

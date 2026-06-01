@@ -141,7 +141,7 @@ async def test_process_fetch_error_sends_warning():
     watcher, bot = _make_watcher()
     url = "https://djinni.co/jobs/bad/"
 
-    mock_fetch = AsyncMock(side_effect=Exception("KMP connection refused"))
+    mock_fetch = AsyncMock(side_effect=Exception("Parser connection refused"))
     with patch("tools.cv_fetch_jd.cv_fetch_jd", mock_fetch):
         await watcher._process(url)
 

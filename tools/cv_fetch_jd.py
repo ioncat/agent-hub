@@ -23,7 +23,7 @@ from urllib.parse import urlparse
 
 from pydantic_ai import RunContext
 
-from adapters.kmp_adapter import KMPError
+from adapters.parser_adapter import ParserError
 from core.deps import AgentDeps
 from db import database
 
@@ -57,13 +57,13 @@ async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
         )
     # status='queued' → webhook pre-created the record; continue to fetch and fill it
 
-    # ── Fetch via kmp-service ─────────────────────────────────────────────────
+    # ── Fetch via jd-parser ───────────────────────────────────────────────────
     t0 = time.monotonic()
     try:
-        doc = await ctx.deps.kmp_adapter.fetch_markdown(url)
-        log.info("cv_fetch_jd: kmp fetch done — elapsed=%.1fs title=%r", time.monotonic() - t0, doc.title)
-    except KMPError as exc:
-        log.error("cv_fetch_jd: KMPError after %.1fs: %s", time.monotonic() - t0, exc)
+        doc = await ctx.deps.parser_adapter.fetch_markdown(url)
+        log.info("cv_fetch_jd: fetch done — elapsed=%.1fs title=%r", time.monotonic() - t0, doc.title)
+    except ParserError as exc:
+        log.error("cv_fetch_jd: ParserError after %.1fs: %s", time.monotonic() - t0, exc)
         return f"⚠️ Не удалось получить вакансию:\n{exc}"
 
     if doc.is_empty:

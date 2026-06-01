@@ -40,7 +40,7 @@
 ## P1 — Integration
 
 ### 🟡 Contract Tests
-- [ ] `tests/test_kmp_adapter.py` — KMPAdapter: mock httpx, test parse/error/health paths
+- [x] `tests/test_parser_adapter.py` — ParserAdapter: mock httpx, test parse/error/health paths
 - [ ] `tests/test_cv_adapter.py` — CVAdapter: mock subprocess/httpx, test pdf/error paths (before + after EPIC-14)
 
 ### 🟡 End-to-end pipeline verification

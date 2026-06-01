@@ -1,15 +1,15 @@
 """
-contracts/parsed_document.py — shared contract for kmp-service /parse response.
+contracts/parsed_document.py — shared contract for jd-parser /parse response.
 
-Mirrors the ParsedDocument model in knowledge-mirror-parser/api.py.
-Both sides must stay in sync — if kmp response changes, update here.
+Mirrors the ParsedDocument model in services/parser/app.py.
+Both sides must stay in sync — if parser response changes, update here.
 """
 
 from pydantic import BaseModel, HttpUrl
 
 
 class ParsedDocument(BaseModel):
-    """Clean-parsed job description returned by kmp-service POST /parse."""
+    """Clean-parsed job description returned by jd-parser POST /parse."""
 
     title: str
     markdown: str

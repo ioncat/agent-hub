@@ -2,7 +2,7 @@
 core/settings.py — application config loaded from env vars.
 
 Required vars: ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
-Optional vars (have defaults): LLM_MODEL, PROFILE_MD_PATH, DB_PATH, KMP_BASE_URL,
+Optional vars (have defaults): LLM_MODEL, PROFILE_MD_PATH, DB_PATH, PARSER_URL,
                                CANDIDATE_NAME, PDF_SERVICE_URL
 
 Fails fast on startup if required vars are missing — never starts in broken state.
@@ -35,7 +35,7 @@ class Settings:
     llm_model: str = "claude-opus-4-5"
     profile_md_path: Path = field(default_factory=lambda: Path("../callback-cv/skill/PROFILE.md"))
     db_path: Path = field(default_factory=lambda: Path("db/agent.db"))
-    kmp_base_url: str = "http://localhost:8001"
+    parser_url: str = "http://localhost:8001"
     pdf_service_url: str = "http://localhost:8002"
     vacancies_path: Path = field(default_factory=lambda: Path("vacancies"))
     max_tokens: int = 4096
@@ -87,7 +87,7 @@ def load_settings() -> Settings:
             "PROFILE_MD_PATH", "../callback-cv/skill/PROFILE.md"
         )),
         db_path=Path(_optional("DB_PATH", "db/agent.db")),
-        kmp_base_url=_optional("KMP_BASE_URL", "http://localhost:8001"),
+        parser_url=_optional("PARSER_URL", "http://localhost:8001"),
         pdf_service_url=_optional("PDF_SERVICE_URL", "http://localhost:8002"),
         vacancies_path=Path(_optional("VACANCIES_PATH", "vacancies")),
         max_tokens=int(_optional("MAX_TOKENS", "4096")),

@@ -135,7 +135,7 @@ flowchart TB
     end
 
     subgraph "services/"
-        KMP["parser/\nURL → Markdown\nHTTP POST /parse"]
+        JDP["jd-parser/\nURL → Markdown\nHTTP POST /parse"]
         PDF["pdf/\nMarkdown → PDF\nHTTP POST /render"]
     end
 
@@ -148,7 +148,7 @@ flowchart TB
     User --> TG --> RT
     RT --> Tools
     Tools --> LLM
-    Tools --> KMP
+    Tools --> JDP
     Tools --> PDF
     Tools --> DB & FS
     Web --> DB

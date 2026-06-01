@@ -1,11 +1,10 @@
 """
-adapters/kmp_adapter.py — async HTTP adapter for kmp-service.
+adapters/parser_adapter.py — async HTTP adapter for jd-parser service.
 
-All calls to knowledge-mirror-parser go through this class.
-Never import kmp internals directly.
+All calls to the job-board URL→Markdown parser go through this class.
 
 Usage:
-    adapter = KMPAdapter(base_url="http://kmp-service:8001")
+    adapter = ParserAdapter(base_url="http://jd-parser:8001")
     doc = await adapter.fetch_markdown("https://djinni.co/jobs/123/")
 """
 
@@ -21,8 +20,8 @@ log = logging.getLogger(__name__)
 _DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=5.0, pool=5.0)
 
 
-class KMPError(Exception):
-    """Raised when kmp-service returns an error or is unreachable."""
+class ParserError(Exception):
+    """Raised when jd-parser returns an error or is unreachable."""
 
     def __init__(self, message: str, url: str, status_code: int | None = None):
         super().__init__(message)
@@ -30,12 +29,12 @@ class KMPError(Exception):
         self.status_code = status_code
 
 
-class KMPAdapter:
-    """Async client for knowledge-mirror-parser HTTP service.
+class ParserAdapter:
+    """Async client for jd-parser HTTP service.
 
     Args:
-        base_url: Base URL of kmp-service (e.g. "http://kmp-service:8001").
-                  Read from KMP_BASE_URL env var via config; injected here.
+        base_url: Base URL of jd-parser (e.g. "http://jd-parser:8001").
+                  Read from PARSER_URL env var via config; injected here.
         timeout:  httpx Timeout object. Override in tests.
     """
 
@@ -48,7 +47,7 @@ class KMPAdapter:
         self._timeout = timeout
 
     async def fetch_markdown(self, url: str) -> ParsedDocument:
-        """Fetch and parse a URL via kmp-service.
+        """Fetch and parse a URL via jd-parser.
 
         Args:
             url: Target page URL (Djinni/DOU job posting or any public URL).
@@ -57,38 +56,38 @@ class KMPAdapter:
             ParsedDocument with title, clean markdown, and source_url.
 
         Raises:
-            KMPError: kmp-service unreachable, returned 5xx, or parse failed.
+            ParserError: jd-parser unreachable, returned 5xx, or parse failed.
         """
         endpoint = f"{self._base_url}/parse"
-        log.debug("KMPAdapter.fetch_markdown → POST %s body=%r", endpoint, url)
+        log.debug("ParserAdapter.fetch_markdown → POST %s body=%r", endpoint, url)
 
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 resp = await client.post(endpoint, json={"url": url})
         except httpx.TransportError as exc:
-            raise KMPError(
-                f"kmp-service unreachable: {exc}",
+            raise ParserError(
+                f"jd-parser unreachable: {exc}",
                 url=url,
             ) from exc
 
         if resp.status_code != 200:
             detail = _extract_detail(resp)
             log.error(
-                "KMPAdapter: POST /parse returned %d for %r — %s",
+                "ParserAdapter: POST /parse returned %d for %r — %s",
                 resp.status_code, url, detail,
             )
-            raise KMPError(
-                f"kmp-service error {resp.status_code}: {detail}",
+            raise ParserError(
+                f"jd-parser error {resp.status_code}: {detail}",
                 url=url,
                 status_code=resp.status_code,
             )
 
         doc = ParsedDocument.model_validate(resp.json())
-        log.debug("KMPAdapter: parsed %r → title=%r, md_len=%d", url, doc.title, len(doc.markdown))
+        log.debug("ParserAdapter: parsed %r → title=%r, md_len=%d", url, doc.title, len(doc.markdown))
         return doc
 
     async def health(self) -> bool:
-        """Check if kmp-service is alive. Returns True if healthy."""
+        """Check if jd-parser is alive. Returns True if healthy."""
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
                 resp = await client.get(f"{self._base_url}/health")

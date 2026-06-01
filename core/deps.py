@@ -9,7 +9,7 @@ Usage in a tool:
     from core.deps import AgentDeps
 
     async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
-        doc = await ctx.deps.kmp_adapter.fetch_markdown(url)
+        doc = await ctx.deps.parser_adapter.fetch_markdown(url)
         ...
 """
 
@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from adapters.cv_adapter import CVAdapter
-from adapters.kmp_adapter import KMPAdapter
+from adapters.parser_adapter import ParserAdapter
 from core.llm_client import ClaudeProvider
 
 
@@ -26,7 +26,7 @@ class AgentDeps:
     """Shared objects injected into every PydanticAI tool via RunContext.
 
     Attributes:
-        kmp_adapter:    Async HTTP client for knowledge-mirror-parser service.
+        parser_adapter: Async HTTP client for jd-parser service (URL → Markdown).
         llm:            ClaudeProvider for direct completions (CV phase tools).
         vacancies_path: Root directory for vacancy filesystem storage.
         candidate_name: Full name used in CV filenames (e.g. "Oleksii_Bondarenko").
@@ -34,7 +34,7 @@ class AgentDeps:
         user_id:        DB user ID for multi-user scoping. Default=1 (single-user mode).
         skill_type:     Routes ALL pipeline phases to prompts/[skill_type]/ (e.g. 'pm', 'generic').
     """
-    kmp_adapter: KMPAdapter
+    parser_adapter: ParserAdapter
     llm: ClaudeProvider
     vacancies_path: Path
     candidate_name: str

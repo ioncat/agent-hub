@@ -45,7 +45,7 @@ except ImportError:
 
 from core.settings import load_settings, ConfigError
 from core.llm_client import ClaudeProvider
-from adapters.kmp_adapter import KMPAdapter
+from adapters.parser_adapter import ParserAdapter
 from adapters.cv_adapter import CVAdapter
 from core.deps import AgentDeps
 from db import database
@@ -110,7 +110,7 @@ async def run_e2e(
         sys.exit(1)
 
     print(f"  AGENT_MODE  : {settings.agent_mode}")
-    print(f"  KMP_BASE_URL: {settings.kmp_base_url}")
+    print(f"  PARSER_URL  : {settings.parser_url}")
     print(f"  DB_PATH     : {settings.db_path}")
     print(f"  CANDIDATE   : {settings.candidate_name}")
     print()
@@ -144,7 +144,7 @@ async def run_e2e(
         auto_confirm=auto_confirm,
     )
 
-    kmp = KMPAdapter(base_url=settings.kmp_base_url)
+    parser = ParserAdapter(base_url=settings.parser_url)
     cv_adapter = CVAdapter(pdf_service_url=settings.pdf_service_url)
 
     # Resolve skill_type for the given user_id
@@ -152,7 +152,7 @@ async def run_e2e(
     skill_type = user_row["skill_type"] if user_row else settings.default_skill_type
 
     deps = AgentDeps(
-        kmp_adapter=kmp,
+        parser_adapter=parser,
         llm=llm,
         vacancies_path=settings.vacancies_path,
         candidate_name=settings.candidate_name,
@@ -168,12 +168,12 @@ async def run_e2e(
 
     # ── Health check (only needed for URL fetch) ──────────────────────────────
     if "fetch" in phases and url and not file_path:
-        print("🔍  Checking kmp-service health…")
-        if not await kmp.health():
-            print(f"❌  kmp-service unreachable at {settings.kmp_base_url}")
-            print("    Start it: docker compose up kmp-service -d")
+        print("🔍  Checking jd-parser health…")
+        if not await parser.health():
+            print(f"❌  jd-parser unreachable at {settings.parser_url}")
+            print("    Start it: docker compose up jd-parser -d")
             sys.exit(1)
-        print("✅  kmp-service healthy\n")
+        print("✅  jd-parser healthy\n")
 
     # ── Phase: fetch (URL mode) ───────────────────────────────────────────────
     if "fetch" in phases and url and not file_path and resolved_vacancy_id is None:

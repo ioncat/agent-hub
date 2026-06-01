@@ -1,7 +1,7 @@
 """
-tests/test_kmp_adapter.py — Contract tests for KMPAdapter.
+tests/test_parser_adapter.py — Contract tests for ParserAdapter.
 
-Mocks httpx.AsyncClient — no real kmp-service needed.
+Mocks httpx.AsyncClient — no real jd-parser service needed.
 Verifies: happy path, all error paths, health check, _extract_detail.
 """
 
@@ -11,11 +11,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from adapters.kmp_adapter import KMPAdapter, KMPError, _extract_detail
+from adapters.parser_adapter import ParserAdapter, ParserError, _extract_detail
 from contracts.parsed_document import ParsedDocument
 
 _URL = "https://djinni.co/jobs/123-backend/"
-_BASE = "http://kmp-service:8001"
+_BASE = "http://jd-parser:8001"
 
 _GOOD_BODY = {
     "title": "Backend Engineer",
@@ -26,8 +26,8 @@ _GOOD_BODY = {
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
-def _adapter() -> KMPAdapter:
-    return KMPAdapter(base_url=_BASE)
+def _adapter() -> ParserAdapter:
+    return ParserAdapter(base_url=_BASE)
 
 
 def _mock_client(status: int, body: object = None, *, text: str = "") -> tuple:
@@ -52,7 +52,7 @@ def _mock_client(status: int, body: object = None, *, text: str = "") -> tuple:
 @pytest.mark.asyncio
 async def test_fetch_markdown_returns_parsed_document():
     MockClient, _ = _mock_client(200, _GOOD_BODY)
-    with patch("adapters.kmp_adapter.httpx.AsyncClient", MockClient):
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
         doc = await _adapter().fetch_markdown(_URL)
     assert isinstance(doc, ParsedDocument)
     assert doc.title == "Backend Engineer"
@@ -63,9 +63,8 @@ async def test_fetch_markdown_returns_parsed_document():
 @pytest.mark.asyncio
 async def test_fetch_markdown_posts_to_correct_endpoint():
     MockClient, _ = _mock_client(200, _GOOD_BODY)
-    with patch("adapters.kmp_adapter.httpx.AsyncClient", MockClient):
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
         await _adapter().fetch_markdown(_URL)
-    # Check post was called with correct URL and payload
     call_args = MockClient.return_value.__aenter__.return_value.post.call_args
     assert call_args[0][0] == f"{_BASE}/parse"
     assert call_args[1]["json"] == {"url": _URL}
@@ -73,9 +72,9 @@ async def test_fetch_markdown_posts_to_correct_endpoint():
 
 @pytest.mark.asyncio
 async def test_fetch_markdown_strips_trailing_slash_from_base():
-    adapter = KMPAdapter(base_url=f"{_BASE}/")
+    adapter = ParserAdapter(base_url=f"{_BASE}/")
     MockClient, _ = _mock_client(200, _GOOD_BODY)
-    with patch("adapters.kmp_adapter.httpx.AsyncClient", MockClient):
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
         await adapter.fetch_markdown(_URL)
     call_args = MockClient.return_value.__aenter__.return_value.post.call_args
     assert call_args[0][0] == f"{_BASE}/parse"
@@ -84,11 +83,11 @@ async def test_fetch_markdown_strips_trailing_slash_from_base():
 # ── fetch_markdown — error paths ──────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_fetch_markdown_503_json_detail_raises_kmp_error():
+async def test_fetch_markdown_503_json_detail_raises_parser_error():
     body = {"detail": "parse_failed"}
     MockClient, _ = _mock_client(503, body)
-    with patch("adapters.kmp_adapter.httpx.AsyncClient", MockClient):
-        with pytest.raises(KMPError) as exc_info:
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
+        with pytest.raises(ParserError) as exc_info:
             await _adapter().fetch_markdown(_URL)
     assert exc_info.value.status_code == 503
     assert exc_info.value.url == _URL
@@ -96,16 +95,16 @@ async def test_fetch_markdown_503_json_detail_raises_kmp_error():
 
 
 @pytest.mark.asyncio
-async def test_fetch_markdown_404_raises_kmp_error():
+async def test_fetch_markdown_404_raises_parser_error():
     MockClient, _ = _mock_client(404, {"detail": "not found"})
-    with patch("adapters.kmp_adapter.httpx.AsyncClient", MockClient):
-        with pytest.raises(KMPError) as exc_info:
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
+        with pytest.raises(ParserError) as exc_info:
             await _adapter().fetch_markdown(_URL)
     assert exc_info.value.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_fetch_markdown_503_non_json_body_raises_kmp_error():
+async def test_fetch_markdown_503_non_json_body_raises_parser_error():
     resp = MagicMock(spec=httpx.Response)
     resp.status_code = 503
     resp.text = "Service Unavailable"
@@ -117,38 +116,38 @@ async def test_fetch_markdown_503_non_json_body_raises_kmp_error():
     MockClient.return_value.__aenter__ = AsyncMock(return_value=async_client)
     MockClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
-    with patch("adapters.kmp_adapter.httpx.AsyncClient", MockClient):
-        with pytest.raises(KMPError) as exc_info:
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
+        with pytest.raises(ParserError) as exc_info:
             await _adapter().fetch_markdown(_URL)
     assert "Service Unavailable" in str(exc_info.value)
     assert exc_info.value.status_code == 503
 
 
 @pytest.mark.asyncio
-async def test_fetch_markdown_transport_error_raises_kmp_error_no_status():
+async def test_fetch_markdown_transport_error_raises_parser_error_no_status():
     async_client = AsyncMock()
     async_client.post.side_effect = httpx.ConnectError("connection refused")
     MockClient = MagicMock()
     MockClient.return_value.__aenter__ = AsyncMock(return_value=async_client)
     MockClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
-    with patch("adapters.kmp_adapter.httpx.AsyncClient", MockClient):
-        with pytest.raises(KMPError) as exc_info:
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
+        with pytest.raises(ParserError) as exc_info:
             await _adapter().fetch_markdown(_URL)
     assert exc_info.value.status_code is None
     assert exc_info.value.url == _URL
 
 
 @pytest.mark.asyncio
-async def test_fetch_markdown_timeout_error_raises_kmp_error():
+async def test_fetch_markdown_timeout_error_raises_parser_error():
     async_client = AsyncMock()
     async_client.post.side_effect = httpx.TimeoutException("timed out")
     MockClient = MagicMock()
     MockClient.return_value.__aenter__ = AsyncMock(return_value=async_client)
     MockClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
-    with patch("adapters.kmp_adapter.httpx.AsyncClient", MockClient):
-        with pytest.raises(KMPError):
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
+        with pytest.raises(ParserError):
             await _adapter().fetch_markdown(_URL)
 
 
@@ -157,14 +156,14 @@ async def test_fetch_markdown_timeout_error_raises_kmp_error():
 @pytest.mark.asyncio
 async def test_health_returns_true_on_200():
     MockClient, _ = _mock_client(200, {"status": "ok"})
-    with patch("adapters.kmp_adapter.httpx.AsyncClient", MockClient):
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
         assert await _adapter().health() is True
 
 
 @pytest.mark.asyncio
 async def test_health_returns_false_on_non_200():
     MockClient, _ = _mock_client(500)
-    with patch("adapters.kmp_adapter.httpx.AsyncClient", MockClient):
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
         assert await _adapter().health() is False
 
 
@@ -176,7 +175,7 @@ async def test_health_returns_false_on_transport_error():
     MockClient.return_value.__aenter__ = AsyncMock(return_value=async_client)
     MockClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
-    with patch("adapters.kmp_adapter.httpx.AsyncClient", MockClient):
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
         assert await _adapter().health() is False
 
 

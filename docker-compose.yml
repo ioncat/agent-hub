@@ -17,8 +17,8 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # ── parser — job board URL → Markdown ────────────────────────────────────
-  kmp-service:
+  # ── jd-parser — job board URL → Markdown ────────────────────────────────
+  jd-parser:
     build:
       context: ./services/parser
       dockerfile: Dockerfile
@@ -57,7 +57,7 @@ services:
     env_file:
       - .env
     environment:
-      KMP_BASE_URL: http://kmp-service:8001
+      PARSER_URL: http://jd-parser:8001
       PDF_SERVICE_URL: http://pdf-service:8002
       DB_PATH: /app/db/agent.db
       VACANCIES_PATH: /app/vacancies
@@ -65,7 +65,7 @@ services:
       - ./db:/app/db                        # SQLite DB — persisted on host
       - ./vacancies:/app/vacancies          # vacancy folders — persisted on host
     depends_on:
-      kmp-service:
+      jd-parser:
         condition: service_healthy
       pdf-service:
         condition: service_healthy
