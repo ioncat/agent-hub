@@ -1,115 +1,133 @@
-# Local App — Desktop Mode
+# Local Execution Mode — Claude Code Skill
 
-**Для кого:** разработчик / администратор. Запускается локально, без Telegram, без телефона.  
-**Что делает:** принимает ссылку на вакансию (или текст JD) → прогоняет полный pipeline → отдаёт CV.pdf + Cover.md прямо в браузер.
-
----
-
-## Что это такое
-
-Local App — это веб-интерфейс поверх того же `web/api.py`, который уже используется как трекер вакансий. Никакого нового приложения — только новый маршрут и новый шаблон.
-
-Отличие от Telegram-бота:
-- нет задержки доставки сообщений
-- прогресс по фазам виден прямо в браузере (SSE)
-- файлы скачиваются одним кликом
-- работает без интернета (кроме Claude API и парсера)
+**Что:** полный CV-pipeline прямо в Claude Code desktop. Никакого Telegram, никакого бота, никакой инфраструктуры.  
+**Как:** slash-команда `/analyze` → Claude Code IS the agent — читает профиль, прогоняет фазы, пишет файлы.  
+**Для кого:** разработчик / сам кандидат — быстрый разбор вакансии без поднятия docker compose.
 
 ---
 
 ## Запуск
 
-### Только web-трекер + local app (без Docker)
-
 ```bash
-# 1. Поднять сервисы (парсер + PDF)
-docker compose up kmp-service pdf-service -d
+# В Claude Code — просто написать:
+/analyze
 
-# 2. Запустить web-сервер
-uvicorn web.api:app --reload
-
-# 3. Открыть в браузере
-http://localhost:8080/app
-```
-
-### Полный стек (Docker Compose)
-
-```bash
-docker compose up
-# → http://localhost:8080/app
+# Или триггер через естественный язык:
+# "проанализируй вакансию", "сделай CV", "разбор вакансии", "job fit"
 ```
 
 ---
 
-## Как пользоваться
+## Команды
 
-1. Открыть `http://localhost:8080/app`
-2. Выбрать пользователя (если их несколько)
-3. Вставить URL вакансии или текст JD в поле ввода
-4. Нажать **Analyze** — pipeline запустится
-5. Следить за прогрессом фаз в реальном времени (1 → 2 → 3 → 3.5 → 4)
-6. После завершения скачать **CV.pdf** и **Cover.md**
-
----
-
-## Эндпоинты
-
-| Метод | URL | Описание |
-|-------|-----|---------|
-| `GET` | `/app` | Главная страница — форма ввода JD + история |
-| `POST` | `/analyze` | Запустить pipeline; тело: `{url?, text?, user_id}` |
-| `GET` | `/pipeline/status/{vacancy_id}` | SSE-поток событий по фазам |
-| `GET` | `/download/{vacancy_id}/cv.pdf` | Скачать CV (PDF) |
-| `GET` | `/download/{vacancy_id}/cover.md` | Скачать Cover Letter (Markdown) |
-| `GET` | `/api/vacancies` | JSON-список всех вакансий (трекер) |
-| `GET` | `/api/users` | JSON-список пользователей |
+| Команда | Действие |
+|---------|---------|
+| `/analyze` | загрузить активного пользователя → начать |
+| `/analyze -u [id\|slug]` | переключить пользователя → начать |
+| `/analyze -l` | показать список пользователей → остановиться |
 
 ---
 
-## Фазы pipeline
+## Как это работает (пошагово)
 
-| Фаза | Инструмент | Вход | Выход |
-|------|-----------|------|-------|
-| 1 — Fetch JD | `cv_fetch_jd` | URL → `services/parser` | `JD.md` |
-| 2 — Analyze | `cv_analyze` | `JD.md` + PROFILE → Claude | `JD_analysis.md` |
-| 3 — Generate CV | `cv_generate` | PROFILE + analysis → Claude | `CV.md` |
-| 3.5 — Self-review | _(внутри cv_generate)_ | `CV.md` → Claude | `CV.md` (revised) |
-| — Render PDF | _(внутри cv_generate)_ | `CV.md` → `services/pdf` | `CV.pdf` |
-| 4 — Cover Letter | `cv_cover` | JD + CV → Claude | `Cover.md` |
+1. `/analyze` → Claude Code читает `skill/active_user` → берёт ID → загружает `skill/users/[id]/PROFILE.md`
+2. Пользователь вставляет URL или текст JD
+3. **Phase 1 + 2** запускаются автоматически — без подтверждения
+   - Результат сохраняется в `JD_analysis.md`
+   - В чат выводится только **Quick Scan** блок
+   - Вопрос: _«Генерируем CV?»_
+4. После подтверждения — **pre-flight** (язык CV + вариант имени, один вопрос)
+5. **Phase 3** — черновик CV (не показывается пользователю)
+6. **Phase 3.5** — self-review → показать пользователю → правки → сохранить `[Name]_CV.md` → сгенерировать PDF
+7. Вопрос: _«Переходим к cover?»_
+8. **Phase 4** — cover letter → правки → сохранить `[Name]_Cover.md`
+
+**Правило: один вопрос за раз. Никогда два вопроса в одном сообщении.**
 
 ---
 
-## Настройка
+## Структура файлов
 
-Все параметры берутся из `.env` / переменных окружения:
+Папка вакансии: `vacancies/[Company — Role]/`
 
-```env
-# Обязательно
-ANTHROPIC_API_KEY=sk-...
-DEFAULT_SKILL_TYPE=pm          # pm | generic
-
-# Сервисы (дефолты совпадают с docker-compose)
-KMP_BASE_URL=http://localhost:8001
-PDF_SERVICE_URL=http://localhost:8002
-DB_PATH=db/agent.db
-VACANCIES_PATH=vacancies
+```
+vacancies/
+└── Acme Corp — Product Manager/
+    ├── JD.md                  ← JD (из URL или вставлен вручную)
+    ├── JD_analysis.md         ← Phase 1 + 2 + 3.5 self-review
+    ├── Kosar_CV.md            ← английское CV
+    ├── Kosar_CV_UA.md         ← украинское CV (если запрошено)
+    ├── Kosar_CV.pdf           ← PDF
+    ├── Kosar_Cover.md         ← cover (английский)
+    └── Kosar_Cover_UA.md      ← cover (украинский, если запрошено)
 ```
 
 ---
 
 ## Профиль пользователя
 
-До EPIC-17 (онбординг): читается из `skill/users/[id]/PROFILE.md`.  
-После EPIC-17: хранится в DB, загружается автоматически.  
-Переход: `AgentDeps` сначала проверяет DB, при отсутствии — файл.
+```
+skill/
+├── active_user          ← ID активного пользователя (одна строка)
+├── users.yaml           ← список пользователей {id, slug, name, profile_path}
+└── users/
+    └── [id]/
+        └── PROFILE.md   ← опыт, навыки, настройки (language, skill_type, name variants)
+```
+
+Переключить пользователя: `/analyze -u kosar` или `/analyze -u 1`
 
 ---
 
-## Ограничения
+## Язык CV и имя
 
-- Одновременно несколько pipeline-запросов работают корректно — каждый получает независимый SSE-поток
-- Авторизации нет — single-user, только локальная сеть
-- Мобильная версия не поддерживается (отдельная фаза)
+- **Язык CV** = язык вакансии (English JD → English CV). Не зависит от настроек пользователя.
+- **Имя** = берётся из `PROFILE.md → ## Name variants`. Если JD не на английском — спросить вариант.
+- Если JD не на английском: предложить три варианта — English / JD-язык / Оба.
+
+---
+
+## PDF-генерация
+
+**Сейчас** (до EPIC-14 на локальной машине):
+```bash
+CAREER_AGENT_FONTS=fonts/ python ../callback-cv/cv_to_pdf.py vacancies/[folder]/[Name]_CV.md
+```
+
+**После EPIC-14** (`services/pdf` запущен):
+```bash
+# Claude Code делает это автоматически — POST markdown → http://localhost:8002/render → PDF bytes
+docker compose up pdf-service -d
+```
+
+---
+
+## Промпты
+
+Все фазы роутятся через `skill_type` из `PROFILE.md → ## Settings`:
+
+| Фаза | Файл |
+|------|------|
+| Phase 1 | `prompts/[skill_type]/phase1_analysis.md` |
+| Phase 2 | `prompts/[skill_type]/phase2_fit.md` |
+| Phase 3 | `prompts/[skill_type]/phase3_cv_draft.md` |
+| Phase 3.5 | `prompts/[skill_type]/phase3_5_review.md` |
+| Phase 4 | `prompts/[skill_type]/phase4_cover.md` |
+
+Доступные `skill_type`: `pm` (активен), `generic` (в разработке).
+
+---
+
+## Отличие от Telegram-бота
+
+| | Claude Code skill | Telegram bot |
+|--|------------------|-------------|
+| Триггер | `/analyze` или фраза | RSS / команда в Telegram |
+| Профиль | `skill/users/[id]/PROFILE.md` | DB (после EPIC-17) |
+| Запись в DB | ❌ нет | ✅ да |
+| PDF | subprocess / HTTP (EPIC-14) | CVAdapter → HTTP |
+| Мультипользователь | `users.yaml` + `active_user` | DB `users` table |
+| Когда использовать | быстрый разбор, без инфраструктуры | полный prod-pipeline |
 
 ---
 
@@ -117,6 +135,7 @@ VACANCIES_PATH=vacancies
 
 - Epic: [`docs/delivery/Epics/EPIC-19-local-execution.md`](delivery/Epics/EPIC-19-local-execution.md)
 - Онбординг (источник профиля): [`docs/delivery/Epics/EPIC-17-onboarding.md`](delivery/Epics/EPIC-17-onboarding.md)
+- Skill types: [`skill/SKILL_TYPES.md`](../skill/SKILL_TYPES.md) _(gitignored — локальный файл)_
 
 ---
 
@@ -128,138 +147,85 @@ VACANCIES_PATH=vacancies
 
 ```mermaid
 flowchart TD
-    User(["👤 Browser\nPOST /analyze\n{url, user_id}"])
-    User --> API["web/api.py\nget user + skill_type from DB"]
+    User(["👤 Claude Code\n/analyze"])
+    User --> Load["Загрузить профиль\nskill/active_user → PROFILE.md"]
 
-    API --> P1
+    Load --> P1
 
-    subgraph P1["⬜ Phase 1 — Fetch JD"]
+    subgraph P1["⬜ Phase 1 + 2 — Analyze JD"]
         direction LR
-        F1["cv_fetch_jd"] -->|"POST /parse {url}"| Parser["services/parser\n:8001"]
-        Parser -->|"markdown + title"| F1
-        F1 --> A1[/"JD.md\nDB: status=fetched"/]
+        F1["phase1_analysis\n+ phase2_fit"] -->|"JD text + PROFILE"| Claude1["Claude API\nprompts/[skill_type]/"]
+        Claude1 -->|"fit score\narchetypes / gaps"| F1
+        F1 --> A1[/"JD_analysis.md\n→ Quick Scan в чат"/]
     end
 
-    P1 --> P2
+    P1 --> Confirm1{"Генерируем CV?"}
+    Confirm1 -->|нет| Stop(["🛑 Стоп"])
+    Confirm1 -->|да| Preflight["Pre-flight:\nязык CV + вариант имени"]
 
-    subgraph P2["⬜ Phase 2 — Analyze"]
+    Preflight --> P3
+
+    subgraph P3["⬜ Phase 3 — CV Draft"]
         direction LR
-        F2["cv_analyze"] -->|"phase1+2 prompt\n+ JD.md + PROFILE"| Claude1["Claude API"]
-        Claude1 -->|"fit score\nstrengths / gaps"| F2
-        F2 --> A2[/"JD_analysis.md\nDB: status=analyzed"/]
+        F3["phase3_cv_draft"] -->|"JD + PROFILE\n+ анализ + язык"| Claude2["Claude API"]
+        Claude2 -->|"черновик CV\n(не показывать)"| F3
     end
 
-    P2 --> P3
+    P3 --> P35
 
-    subgraph P3["⬜ Phase 3 — Generate CV"]
+    subgraph P35["⬜ Phase 3.5 — Self-Review"]
         direction LR
-        F3a["cv_generate"] -->|"phase3 prompt\n+ PROFILE + analysis"| Claude2["Claude API"]
-        Claude2 -->|CV draft| F3a
-        F3a -->|"phase3_5 self-review"| Claude3["Claude API"]
-        Claude3 -->|CV reviewed| F3a
-        F3a -->|"POST /render {markdown}"| PDF["services/pdf\n:8002"]
-        PDF -->|PDF bytes| F3a
-        F3a --> A3[/"CV.md + CV.pdf\nDB: status=cv_ready"/]
+        F35["phase3_5_review"] -->|"черновик + анализ"| Claude3["Claude API"]
+        Claude3 -->|"рецензия + правки"| F35
+        F35 --> A35[/"[Name]_CV.md\n→ PDF\n→ показать пользователю"/]
     end
 
-    P3 --> P4
+    A35 --> Confirm2{"Правки или ок?"}
+    Confirm2 -->|правки| P35
+    Confirm2 -->|ок| Confirm3{"Переходим к cover?"}
+    Confirm3 -->|нет| Done1(["✅ CV готов"])
+
+    Confirm3 -->|да| P4
 
     subgraph P4["⬜ Phase 4 — Cover Letter"]
         direction LR
-        F4["cv_cover"] -->|"phase4 prompt\n+ JD + CV"| Claude4["Claude API"]
+        F4["phase4_cover"] -->|"JD + CV + анализ"| Claude4["Claude API"]
         Claude4 -->|cover letter| F4
-        F4 --> A4[/"Cover.md\nDB: status=done"/]
+        F4 --> A4[/"[Name]_Cover.md\n→ показать пользователю"/]
     end
 
-    P4 --> Done["✅ {vacancy_id, status: done}"]
-
-    Done -->|"SSE stream\n/pipeline/status/{id}"| SSE(["👤 Browser\nphase progress events"])
-    Done -->|"GET /download/{id}/cv.pdf"| DL1(["👤 Browser\nCV.pdf"])
-    Done -->|"GET /download/{id}/cover.md"| DL2(["👤 Browser\nCover.md"])
-```
-
-### Request flow (sequence)
-
-```mermaid
-sequenceDiagram
-    actor User as 👤 Browser
-    participant API as web/api.py<br/>(FastAPI)
-    participant Agent as core/router.py<br/>(PydanticAI Agent)
-    participant Parser as services/parser<br/>:8001
-    participant Claude as Claude API
-    participant PDF as services/pdf<br/>:8002
-    participant DB as SQLite DB
-    participant FS as vacancies/<br/>[user_id]/[site]/[month]/
-
-    User->>API: POST /analyze {url or text, user_id}
-    API->>DB: get user + skill_type
-    API->>Agent: run pipeline (AgentDeps)
-
-    Note over Agent: Phase 1 — fetch_jd
-    Agent->>Parser: POST /parse {url}
-    Parser-->>Agent: {markdown, title}
-    Agent->>FS: write JD.md
-    Agent->>DB: insert_vacancy (status=fetched)
-
-    Note over Agent: Phase 2 — analyze
-    Agent->>Claude: prompts/[skill_type]/phase1+2.md + JD.md
-    Claude-->>Agent: JD_analysis.md
-    Agent->>FS: write JD_analysis.md
-    Agent->>DB: update status=analyzed
-
-    Note over Agent: Phase 3 — generate CV
-    Agent->>Claude: prompts/[skill_type]/phase3.md + PROFILE
-    Claude-->>Agent: CV.md (draft)
-    Agent->>Claude: phase3_5 self-review
-    Claude-->>Agent: CV.md (reviewed)
-    Agent->>PDF: POST /render {markdown}
-    PDF-->>Agent: PDF bytes
-    Agent->>FS: write CV.md + CV.pdf
-    Agent->>DB: update status=cv_ready
-
-    Note over Agent: Phase 4 — cover letter
-    Agent->>Claude: prompts/[skill_type]/phase4.md
-    Claude-->>Agent: Cover.md
-    Agent->>FS: write Cover.md
-    Agent->>DB: update status=done
-
-    API-->>User: {vacancy_id, status: "done"}
-
-    User->>API: GET /pipeline/status/{vacancy_id} (SSE)
-    API-->>User: event: phase_done (per phase, streamed)
-
-    User->>API: GET /download/{vacancy_id}/cv.pdf
-    API-->>User: CV.pdf (binary)
-    User->>API: GET /download/{vacancy_id}/cover.md
-    API-->>User: Cover.md (text)
+    A4 --> Confirm4{"Правки или ок?"}
+    Confirm4 -->|правки| P4
+    Confirm4 -->|ок| Done2(["✅ CV + Cover готовы"])
 ```
 
 ### Component map
 
 ```mermaid
 graph TD
-    Browser["👤 Browser<br/>(local_app.html)"]
-    API["web/api.py<br/>FastAPI :8080"]
-    Agent["core/router.py<br/>PydanticAI Agent"]
-    Profile["Profile source"]
-    Parser["services/parser<br/>kmp-service :8001"]
-    PDF["services/pdf<br/>pdf-service :8002"]
+    CC["👤 Claude Code Desktop\n/analyze command"]
+    SKILL["skill/SKILL.md\nорхестрация"]
+    PROFILE["skill/users/[id]/PROFILE.md\nпрофиль кандидата"]
+    Prompts["prompts/[skill_type]/\nphase1..4"]
     Claude["Claude API"]
-    DB[("SQLite DB<br/>db/agent.db")]
-    FS["vacancies/<br/>[user_id]/[site]/[month]/"]
+    FS["vacancies/[Company — Role]/\nJD.md, CV.md, Cover.md, PDF"]
+    PDF_local["subprocess\ncv_to_pdf.py\n(до EPIC-14)"]
+    PDF_svc["services/pdf :8002\n(после EPIC-14)"]
 
-    Browser -->|POST /analyze| API
-    Browser -->|SSE /pipeline/status/id| API
-    Browser -->|GET /download/id/file| API
-
-    API --> Agent
-    Agent --> Profile
-    Agent --> Parser
-    Agent --> PDF
-    Agent --> Claude
-    Agent --> DB
-    Agent --> FS
-
-    Profile -->|pre-EPIC-17| SKILL["skill/users/[id]/<br/>PROFILE.md"]
-    Profile -->|post-EPIC-17| DB
+    CC --> SKILL
+    SKILL --> PROFILE
+    SKILL --> Prompts
+    Prompts --> Claude
+    Claude --> SKILL
+    SKILL --> FS
+    SKILL --> PDF_local
+    SKILL --> PDF_svc
 ```
+
+### Источник профиля (переход)
+
+| Этап | Источник |
+|------|---------|
+| Сейчас (pre-EPIC-17) | `skill/users/[id]/PROFILE.md` — filesystem |
+| После EPIC-17 | DB `users.profile_md` — запись при онбординге |
+| Переход | `AgentDeps` проверяет DB → если нет, читает файл |
