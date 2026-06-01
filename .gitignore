@@ -49,6 +49,9 @@ seen_jobs.json
 CLAUDE.md
 docs/discovery/
 
+# Personal skill + profile (private data — not for public repo)
+skill/
+
 # Windows OS junk
 *.lnk
 
