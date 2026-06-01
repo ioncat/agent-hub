@@ -1,0 +1,17 @@
+[
+  {
+    "name": "DOU.ua — Product Manager",
+    "url": "https://jobs.dou.ua/vacancies/feeds/?remote&category=Product%20Manager",
+    "recipients": ["CHAT_ID_1"]
+  },
+  {
+    "name": "DOU.ua — QA",
+    "url": "https://jobs.dou.ua/vacancies/feeds/?remote&category=QA",
+    "recipients": ["CHAT_ID_2"]
+  },
+  {
+    "name": "Djinni — Remote (both)",
+    "url": "https://djinni.co/jobs/rss/?employment=remote",
+    "recipients": ["CHAT_ID_1", "CHAT_ID_2"]
+  }
+]

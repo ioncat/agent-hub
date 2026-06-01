@@ -32,6 +32,22 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  # ── job-monitor — RSS feed watcher → webhook push ─────────────────────────
+  job-monitor:
+    build:
+      context: ./services/job-monitor
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /app/data
+    volumes:
+      - ./services/job-monitor/data:/app/data      # seen_jobs.json, monitor.log, lock
+      - ./services/job-monitor/feeds.json:/app/feeds.json:ro   # !! create from feeds.example.json
+    depends_on:
+      - web-tracker
+    restart: unless-stopped
+
   # ── career-agent — Telegram bot + RSS watcher ──────────────────────────────
   career-agent:
     build:

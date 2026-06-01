@@ -1,0 +1,19 @@
+{
+  "interval_minutes": 5,
+  "http_timeout": {
+    "total_seconds": 30,
+    "connect_seconds": 10
+  },
+  "check_timeout_seconds": 120,
+  "retry": {
+    "backoff_schedule_seconds": [60, 300, 1800, 7200]
+  },
+  "telegram": {
+    "disable_web_page_preview": false
+  },
+  "logging": {
+    "level": "INFO",
+    "max_bytes": 10485760,
+    "backup_count": 5
+  }
+}
