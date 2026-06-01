@@ -2,19 +2,25 @@
 """
 scripts/e2e_test.py — Manual end-to-end pipeline test.
 
-Runs cv_fetch_jd → cv_analyze on a real vacancy URL.
+Three input modes:
+  --url URL         fetch JD from web, then run pipeline phases
+  --file PATH.md    read JD from local .md file (skips fetch)
+  --id VACANCY_ID   reprocess existing DB vacancy (skips fetch)
+
 Does NOT send Telegram messages — prints output to stdout.
 
 Requires:
     - .env with ANTHROPIC_API_KEY (and AGENT_MODE=testing for confirmation)
-    - kmp-service running on KMP_BASE_URL (default http://localhost:8001)
+    - kmp-service on KMP_BASE_URL for --url mode (default http://localhost:8001)
     - DB at DB_PATH (default db/agent.db)
 
 Usage:
     python scripts/e2e_test.py
     python scripts/e2e_test.py --url https://jobs.dou.ua/companies/.../
-    python scripts/e2e_test.py --phase fetch          # only fetch JD
-    python scripts/e2e_test.py --phase fetch,analyze  # fetch + analyze
+    python scripts/e2e_test.py --file vacancies/djinni/2026-06/123/JD.md
+    python scripts/e2e_test.py --id 42
+    python scripts/e2e_test.py --url https://... --phase fetch,analyze
+    python scripts/e2e_test.py --id 42 --phase generate,cover
 """
 
 import argparse
@@ -54,11 +60,24 @@ class _Ctx:
     deps: AgentDeps
 
 
-async def run_e2e(url: str, phases: list[str]) -> None:
+async def run_e2e(
+    url: str | None,
+    phases: list[str],
+    file_path: Path | None = None,
+    vacancy_id: int | None = None,
+) -> None:
+    # Determine mode label for display
+    if file_path:
+        mode = f"file: {file_path}"
+    elif vacancy_id is not None:
+        mode = f"vacancy_id: #{vacancy_id}"
+    else:
+        mode = f"url: {url}"
+
     print(f"\n{'='*60}")
     print(f"  career-agent e2e test")
-    print(f"  URL: {url}")
-    print(f"  Phases: {', '.join(phases)}")
+    print(f"  Input  : {mode}")
+    print(f"  Phases : {', '.join(phases)}")
     print(f"{'='*60}\n")
 
     # ── Settings & services ───────────────────────────────────────────────────
@@ -97,76 +116,101 @@ async def run_e2e(url: str, phases: list[str]) -> None:
         vacancies_path=settings.vacancies_path,
         candidate_name=settings.candidate_name,
         cv_adapter=cv_adapter,
+        user_id=1,
+        skill_type=settings.default_skill_type,
     )
     ctx = _Ctx(deps=deps)
 
-    # ── Health check ──────────────────────────────────────────────────────────
-    print("🔍  Checking kmp-service health…")
-    if not await kmp.health():
-        print(f"❌  kmp-service unreachable at {settings.kmp_base_url}")
-        print("    Start it: cd knowledge-mirror-parser && python -m uvicorn api:app --port 8001")
-        sys.exit(1)
-    print("✅  kmp-service healthy\n")
+    # ── Resolve vacancy_id from --id mode ─────────────────────────────────────
+    resolved_vacancy_id: int | None = vacancy_id
 
-    # ── Phase: fetch ──────────────────────────────────────────────────────────
-    vacancy_id: int | None = None
+    # ── Health check (only needed for URL fetch) ──────────────────────────────
+    if "fetch" in phases and url and not file_path:
+        print("🔍  Checking kmp-service health…")
+        if not await kmp.health():
+            print(f"❌  kmp-service unreachable at {settings.kmp_base_url}")
+            print("    Start it: docker compose up kmp-service -d")
+            sys.exit(1)
+        print("✅  kmp-service healthy\n")
 
-    if "fetch" in phases:
+    # ── Phase: fetch (URL mode) ───────────────────────────────────────────────
+    if "fetch" in phases and url and not file_path and resolved_vacancy_id is None:
         print("📄  Phase: cv_fetch_jd")
         from tools.cv_fetch_jd import cv_fetch_jd
         result = await cv_fetch_jd(ctx, url)  # type: ignore[arg-type]
         print(f"\n--- cv_fetch_jd result ---\n{result}\n")
 
-        # Get vacancy_id from DB
         from db.database import get_vacancy_by_url
         row = await get_vacancy_by_url(url)
         if row:
-            vacancy_id = row["id"]
-            print(f"  DB vacancy_id: #{vacancy_id}\n")
+            resolved_vacancy_id = row["id"]
+            print(f"  DB vacancy_id: #{resolved_vacancy_id}\n")
+
+    # ── Phase: fetch (file mode) ──────────────────────────────────────────────
+    elif "fetch" in phases and file_path:
+        print(f"📄  Phase: load JD from file — {file_path}")
+        if not file_path.exists():
+            print(f"❌  File not found: {file_path}")
+            sys.exit(1)
+        content = file_path.read_text(encoding="utf-8")
+        # Extract title from first # heading
+        title = "Vacancy"
+        for line in content.splitlines():
+            if line.startswith("# "):
+                title = line[2:].strip()
+                break
+        synthetic_url = f"file://{file_path.resolve()}"
+        from db.database import insert_vacancy, get_vacancy_by_url
+        existing = await get_vacancy_by_url(synthetic_url)
+        if existing:
+            resolved_vacancy_id = existing["id"]
+            print(f"  Already in DB: vacancy_id=#{resolved_vacancy_id}\n")
+        else:
+            resolved_vacancy_id = await insert_vacancy(
+                url=synthetic_url,
+                title=title,
+                markdown_path=str(file_path.resolve()),
+                user_id=1,
+            )
+            print(f"  Inserted into DB: vacancy_id=#{resolved_vacancy_id}\n")
+
+    # ── --id mode: vacancy already in DB ─────────────────────────────────────
+    elif resolved_vacancy_id is not None:
+        from db.database import get_vacancy_by_id
+        row = await get_vacancy_by_id(resolved_vacancy_id)
+        if not row:
+            print(f"❌  Vacancy #{resolved_vacancy_id} not found in DB")
+            sys.exit(1)
+        print(f"📂  Using existing vacancy #{resolved_vacancy_id}: {row['title'] or row['url']}\n")
+
+    def _require_vacancy_id(phase_name: str) -> int:
+        if resolved_vacancy_id is None:
+            print(f"❌  No vacancy_id — run 'fetch' phase first or use --id")
+            sys.exit(1)
+        return resolved_vacancy_id
 
     # ── Phase: analyze ────────────────────────────────────────────────────────
     if "analyze" in phases:
-        if vacancy_id is None:
-            from db.database import get_vacancy_by_url
-            row = await get_vacancy_by_url(url)
-            if not row:
-                print("❌  Vacancy not in DB — run 'fetch' phase first")
-                sys.exit(1)
-            vacancy_id = row["id"]
-
-        print(f"🔬  Phase: cv_analyze (vacancy #{vacancy_id})")
+        vid = _require_vacancy_id("analyze")
+        print(f"🔬  Phase: cv_analyze (vacancy #{vid})")
         from tools.cv_analyze import cv_analyze
-        result = await cv_analyze(ctx, vacancy_id)  # type: ignore[arg-type]
+        result = await cv_analyze(ctx, vid)  # type: ignore[arg-type]
         print(f"\n--- cv_analyze result ---\n{result}\n")
 
     # ── Phase: generate ───────────────────────────────────────────────────────
     if "generate" in phases:
-        if vacancy_id is None:
-            from db.database import get_vacancy_by_url
-            row = await get_vacancy_by_url(url)
-            if not row:
-                print("❌  Vacancy not in DB — run 'fetch' phase first")
-                sys.exit(1)
-            vacancy_id = row["id"]
-
-        print(f"📝  Phase: cv_generate (vacancy #{vacancy_id})")
+        vid = _require_vacancy_id("generate")
+        print(f"📝  Phase: cv_generate (vacancy #{vid})")
         from tools.cv_generate import cv_generate
-        result = await cv_generate(ctx, vacancy_id)  # type: ignore[arg-type]
+        result = await cv_generate(ctx, vid)  # type: ignore[arg-type]
         print(f"\n--- cv_generate result ---\n{result}\n")
 
     # ── Phase: cover ──────────────────────────────────────────────────────────
     if "cover" in phases:
-        if vacancy_id is None:
-            from db.database import get_vacancy_by_url
-            row = await get_vacancy_by_url(url)
-            if not row:
-                print("❌  Vacancy not in DB — run 'fetch' phase first")
-                sys.exit(1)
-            vacancy_id = row["id"]
-
-        print(f"✉️   Phase: cv_cover (vacancy #{vacancy_id})")
+        vid = _require_vacancy_id("cover")
+        print(f"✉️   Phase: cv_cover (vacancy #{vid})")
         from tools.cv_cover import cv_cover
-        result = await cv_cover(ctx, vacancy_id)  # type: ignore[arg-type]
+        result = await cv_cover(ctx, vid)  # type: ignore[arg-type]
         print(f"\n--- cv_cover result ---\n{result}\n")
 
     # ── Session cost summary ──────────────────────────────────────────────────
@@ -181,16 +225,54 @@ async def run_e2e(url: str, phases: list[str]) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="End-to-end pipeline test")
-    parser.add_argument("--url", default=_DEFAULT_URL, help="Vacancy URL to process")
+    parser = argparse.ArgumentParser(
+        description="End-to-end pipeline test",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Input modes (mutually exclusive):
+  --url URL       fetch from web (default if nothing specified)
+  --file PATH.md  read JD from local file, skip fetch
+  --id N          reprocess existing DB vacancy by ID, skip fetch
+
+Examples:
+  python scripts/e2e_test.py
+  python scripts/e2e_test.py --url https://djinni.co/jobs/123/
+  python scripts/e2e_test.py --file vacancies/djinni/2026-06/123/JD.md
+  python scripts/e2e_test.py --id 42
+  python scripts/e2e_test.py --id 42 --phase generate,cover
+        """,
+    )
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--url", default=None, help="Vacancy URL to process")
+    group.add_argument("--file", dest="file_path", default=None, metavar="PATH",
+                       help="Path to JD .md file (skips fetch phase)")
+    group.add_argument("--id", dest="vacancy_id", type=int, default=None, metavar="N",
+                       help="Existing DB vacancy ID (skips fetch phase)")
     parser.add_argument(
         "--phase",
-        default="fetch,analyze",
-        help="Comma-separated phases: fetch,analyze,generate,cover (default: fetch,analyze)",
+        default=None,
+        help="Comma-separated phases: fetch,analyze,generate,cover "
+             "(default: fetch,analyze for URL; analyze,generate,cover for file/id)",
     )
     args = parser.parse_args()
-    phases = [p.strip() for p in args.phase.split(",")]
-    asyncio.run(run_e2e(args.url, phases))
+
+    # Defaults
+    file_path = Path(args.file_path) if args.file_path else None
+    url = args.url or (_DEFAULT_URL if not file_path and args.vacancy_id is None else None)
+
+    if args.phase:
+        phases = [p.strip() for p in args.phase.split(",")]
+    elif file_path or args.vacancy_id is not None:
+        phases = ["analyze", "generate", "cover"]
+    else:
+        phases = ["fetch", "analyze"]
+
+    asyncio.run(run_e2e(
+        url=url,
+        phases=phases,
+        file_path=file_path,
+        vacancy_id=args.vacancy_id,
+    ))
 
 
 if __name__ == "__main__":

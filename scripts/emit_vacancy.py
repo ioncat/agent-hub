@@ -1,119 +1,124 @@
 #!/usr/bin/env python3
 """
-scripts/emit_vacancy.py — Emit a test vacancy into seen_jobs.json.
+scripts/emit_vacancy.py — Queue a test vacancy into career-agent via webhook.
 
-Simulates what job-board-monitor does when it finds a new job posting.
-The RSSWatcher (core/rss_watcher.py) will pick up the URL on its next poll.
+Simulates what job-monitor does: POSTs to POST /api/new-vacancy.
+RSSWatcher picks it up on next DB poll and runs cv_fetch_jd.
+
+Requires:
+    web-tracker running on WEB_TRACKER_URL (default http://localhost:8080)
 
 Usage:
-    # Add a vacancy (RSS watcher picks it up automatically)
+    # Queue a vacancy (RSSWatcher picks it up automatically)
     python scripts/emit_vacancy.py https://djinni.co/jobs/123/
 
-    # Add with optional title (for readability in the file)
-    python scripts/emit_vacancy.py https://djinni.co/jobs/123/ --title "Senior Backend Dev"
+    # With optional title and user_id
+    python scripts/emit_vacancy.py https://djinni.co/jobs/123/ --title "Senior PM" --user-id 1
 
-    # Use a custom seen_jobs.json path (e.g. from job-board-monitor repo)
-    python scripts/emit_vacancy.py https://djinni.co/jobs/123/ --file ../job-board-monitor/seen_jobs.json
-
-    # List current entries
+    # List queued vacancies (status=queued in DB)
     python scripts/emit_vacancy.py --list
 
-    # Clear all entries (reset RSS state)
-    python scripts/emit_vacancy.py --clear
+    # Custom tracker URL
+    python scripts/emit_vacancy.py https://... --tracker http://localhost:8080
 """
 
 import argparse
-import json
+import asyncio
 import sys
-from datetime import datetime
 from pathlib import Path
 
-_DEFAULT_FILE = Path("seen_jobs.json")
+_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(_ROOT))
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv(_ROOT / ".env", override=True)
+except ImportError:
+    pass
 
 
-def _load(path: Path) -> list[dict]:
-    if not path.exists():
-        return []
+async def emit(url: str, title: str, user_id: int, tracker_url: str) -> None:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return data if isinstance(data, list) else []
-    except (json.JSONDecodeError, OSError) as exc:
-        print(f"⚠️  Error reading {path}: {exc}", file=sys.stderr)
-        return []
+        import httpx
+    except ImportError:
+        print("❌  httpx not installed: pip install httpx")
+        sys.exit(1)
+
+    endpoint = f"{tracker_url.rstrip('/')}/api/new-vacancy"
+    payload = {"url": url, "user_id": user_id}
+    if title:
+        payload["title"] = title
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        try:
+            resp = await client.post(endpoint, json=payload)
+        except httpx.ConnectError:
+            print(f"❌  Cannot connect to {endpoint}")
+            print("    Start web-tracker: uvicorn web.api:app --reload")
+            sys.exit(1)
+
+    if resp.status_code == 201:
+        data = resp.json()
+        print(f"✅  Queued:")
+        print(f"   URL:        {url}")
+        print(f"   vacancy_id: #{data['vacancy_id']}")
+        print(f"   status:     {data['status']}")
+        print()
+        print("   RSSWatcher will pick it up on next poll cycle (default: 30s).")
+    elif resp.status_code == 409:
+        print(f"⚠️  Already in DB: {url}")
+    else:
+        print(f"❌  Unexpected response: {resp.status_code}")
+        print(f"    {resp.text[:300]}")
+        sys.exit(1)
 
 
-def _save(path: Path, entries: list[dict]) -> None:
-    path.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
+async def list_queued(tracker_url: str) -> None:
+    try:
+        import httpx
+    except ImportError:
+        print("❌  httpx not installed: pip install httpx")
+        sys.exit(1)
+
+    endpoint = f"{tracker_url.rstrip('/')}/api/vacancies?status=queued&limit=50"
+    async with httpx.AsyncClient(timeout=10) as client:
+        try:
+            resp = await client.get(endpoint)
+        except httpx.ConnectError:
+            print(f"❌  Cannot connect to {endpoint}")
+            sys.exit(1)
+
+    rows = resp.json()
+    if not rows:
+        print("📭  No queued vacancies.")
+        return
+    print(f"📋  Queued vacancies ({len(rows)}):")
+    for r in rows:
+        print(f"  #{r['id']}  {r['url'][:80]}  [{r.get('title') or '—'}]")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Emit a test vacancy into seen_jobs.json (RSS channel emulator)",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="Queue a test vacancy into career-agent via POST /api/new-vacancy"
     )
-    parser.add_argument("url", nargs="?", help="Job posting URL to add")
+    parser.add_argument("url", nargs="?", help="Job posting URL to queue")
     parser.add_argument("--title", default="", help="Job title hint (optional)")
-    parser.add_argument(
-        "--file",
-        default=str(_DEFAULT_FILE),
-        metavar="PATH",
-        help=f"Path to seen_jobs.json (default: {_DEFAULT_FILE})",
-    )
-    parser.add_argument("--list", action="store_true", help="List current entries and exit")
-    parser.add_argument("--clear", action="store_true", help="Clear all entries and exit")
+    parser.add_argument("--user-id", type=int, default=1, dest="user_id",
+                        help="career-agent user_id (default: 1)")
+    parser.add_argument("--tracker", default="http://localhost:8080", dest="tracker_url",
+                        metavar="URL", help="Web-tracker base URL (default: http://localhost:8080)")
+    parser.add_argument("--list", action="store_true", help="List queued vacancies and exit")
     args = parser.parse_args()
 
-    path = Path(args.file)
-
-    # ── --list ────────────────────────────────────────────────────────────────
     if args.list:
-        entries = _load(path)
-        if not entries:
-            print(f"📭 {path} is empty or does not exist")
-            return
-        print(f"📋 {path} — {len(entries)} entr{'y' if len(entries) == 1 else 'ies'}:")
-        for i, e in enumerate(entries, 1):
-            title = f" [{e['title']}]" if e.get("title") else ""
-            print(f"  {i}. {e.get('url', '?')}{title} @ {e.get('seen_at', '?')}")
+        asyncio.run(list_queued(args.tracker_url))
         return
 
-    # ── --clear ───────────────────────────────────────────────────────────────
-    if args.clear:
-        _save(path, [])
-        print(f"🗑️  Cleared {path}")
-        return
-
-    # ── Add URL ───────────────────────────────────────────────────────────────
     if not args.url:
         parser.print_help()
         sys.exit(1)
 
-    url = args.url.strip()
-    entries = _load(path)
-    existing_urls = {e.get("url") for e in entries}
-
-    if url in existing_urls:
-        print(f"⚠️  Already in {path}:")
-        print(f"   {url}")
-        print("   Use --clear to reset or choose a different URL.")
-        return
-
-    entry: dict = {
-        "url": url,
-        "title": args.title,
-        "seen_at": datetime.now().isoformat(timespec="seconds"),
-    }
-    entries.append(entry)
-    _save(path, entries)
-
-    print(f"✅ Added to {path}:")
-    print(f"   URL:      {url}")
-    if args.title:
-        print(f"   Title:    {args.title}")
-    print(f"   Seen at:  {entry['seen_at']}")
-    print()
-    print("   RSSWatcher will pick it up on the next poll cycle.")
-    print(f"   (Default poll interval: 60s — override with RSS_POLL_INTERVAL env var)")
+    asyncio.run(emit(args.url, args.title, args.user_id, args.tracker_url))
 
 
 if __name__ == "__main__":

@@ -1,5 +1,8 @@
 # Claude Code (local session memory and settings — stays with project, not pushed)
-.claude/
+.claude/sessions/
+.claude/memory/
+.claude/todos/
+# .claude/commands/ is tracked — project slash commands belong in repo
 
 # Python
 __pycache__/
