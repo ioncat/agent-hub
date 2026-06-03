@@ -8,6 +8,7 @@ rendering via marked.js.
 All parsing is best-effort: missing fields return empty strings, never raises.
 """
 
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -17,7 +18,7 @@ _FIT_RE   = re.compile(r"\*\*Fit score:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
 _REC_RE   = re.compile(r"\*\*Recommendation:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
 _CAT_RE   = re.compile(r"\*\*Category:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
 _WARN_RE  = re.compile(r"\*\*Warnings:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
-_BLOCK_RE = re.compile(r"\*\*Blockers:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
+_BLOCK_RE = re.compile(r"\*\*Key Barriers:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
 
 # Statuses that imply the given artifact exists
 _STATUS_ORDER = ["fetched", "analyzed", "cv_generated", "cover_generated"]
@@ -49,19 +50,48 @@ class VacancyView:
     has_cv: bool
     has_cover: bool
     has_pdf: bool
+    cv_pdf_url: str         # "/files/vacancies/..." — empty string if no PDF
     analysis_md: str        # full JD_analysis.md content for marked.js rendering
+    salary: str              # "$4500" or "" if unknown
 
     # ── Derived properties ────────────────────────────────────────────────────
 
     @property
     def rec_class(self) -> str:
-        """CSS class for row left-border colour."""
-        rec = self.recommendation.lower()
-        if "не подавать" in rec or "not apply" in rec:
+        """CSS class for row left-border colour.
+
+        Canonical values: apply → rec-yes, decline → rec-no, take a chance → rec-consider.
+        Also handles legacy Russian/Ukrainian values for backward compatibility.
+        """
+        rec = self.recommendation.lower().strip()
+        # Negative — decline
+        if rec == "decline" or "не подавать" in rec or "не підавати" in rec or "not apply" in rec:
             return "rec-no"
-        if "подавать" in rec or "apply" in rec:
+        # Consider — take a chance (must check before generic "подавать" which is a substring)
+        if rec == "take a chance" or "рассмотреть" in rec or "розглянути" in rec:
+            return "rec-consider"
+        # Positive — apply
+        if rec == "apply" or "подавать" in rec or "підавати" in rec:
             return "rec-yes"
         return ""
+
+    @property
+    def barriers_list(self) -> list[str]:
+        """Split Key Barriers text into individual chip items.
+
+        Supports two formats:
+        - New (semicolon): "A/B testing; consumer product; PSP/POS"
+        - Legacy (sentences): "No A/B testing. No consumer product."
+        """
+        raw = (self.blockers or "").strip()
+        if not raw or raw.lower() in ("нет", "none", "—", "-"):
+            return []
+        if ";" in raw:
+            items = [i.strip().rstrip(".") for i in raw.split(";")]
+        else:
+            items = re.split(r"\.\s+", raw)
+            items = [i.strip().rstrip(".") for i in items]
+        return [i for i in items if i and len(i) > 3 and i.lower() not in ("нет", "none", "—", "-")]
 
     @property
     def warn_count(self) -> int:
@@ -74,6 +104,13 @@ class VacancyView:
     def warn_text_escaped(self) -> str:
         """Warnings with single quotes escaped for inline onclick='showWarn(...)'."""
         return self.warnings.replace("'", "\\'").replace('"', "&quot;")
+
+    @property
+    def site_display(self) -> str:
+        """Human-readable source label for display in tracker."""
+        _LABELS = {"djinni": "Djinni", "dou": "DOU", "linkedin": "LinkedIn"}
+        s = (self.site or "").lower()
+        return _LABELS.get(s, self.site.capitalize() if self.site else "Other")
 
 
 def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> VacancyView:
@@ -89,21 +126,28 @@ def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> Vacanc
     created_at: str = row["created_at"] or ""  # type: ignore[index]
     markdown_path: str | None = row["markdown_path"]  # type: ignore[index]
     db_warnings: str = row["warnings"] if "warnings" in row.keys() else ""  # type: ignore[index]
+    db_salary: str = row["salary"] if "salary" in row.keys() and row["salary"] else ""  # type: ignore[index]
+    db_analysis_json: str | None = row["analysis_json"] if "analysis_json" in row.keys() else None  # type: ignore[index]
 
     date = created_at[:10]  # "YYYY-MM-DD"
-    safe_name = re.sub(r"[^\w\-]", "_", candidate_name)
 
     # ── Artifact paths ────────────────────────────────────────────────────────
     folder = Path(markdown_path).parent if markdown_path else None
     analysis_path = folder / "JD_analysis.md" if folder else None
-    cv_md_path    = folder / f"{safe_name}_CV.md" if folder else None
-    cv_pdf_path   = folder / f"{safe_name}_CV.pdf" if folder else None
-    cover_path    = folder / f"{safe_name}_Cover.md" if folder else None
+
+    # Scan folder for CV/cover/PDF files — do NOT rely on candidate_name/env var.
+    # Matches any file ending in _CV.md, _CV.pdf, _Cover.md regardless of name prefix.
+    cv_md_files  = list(folder.glob("*_CV.md"))  if folder and folder.exists() else []
+    cv_pdf_files = list(folder.glob("*_CV.pdf")) if folder and folder.exists() else []
+    cover_files  = list(folder.glob("*_Cover.md")) if folder and folder.exists() else []
+
+    cv_pdf_path = cv_pdf_files[0] if cv_pdf_files else None
 
     has_analysis = bool(analysis_path and analysis_path.exists())
-    has_cv       = bool(cv_md_path and cv_md_path.exists())
-    has_cover    = bool(cover_path and cover_path.exists())
-    has_pdf      = bool(cv_pdf_path and cv_pdf_path.exists())
+    has_cv       = bool(cv_md_files)
+    has_cover    = bool(cover_files)
+    has_pdf      = bool(cv_pdf_files)
+    cv_pdf_url   = ("/files/" + str(cv_pdf_path).replace("\\", "/")) if cv_pdf_path else ""
 
     # ── Parse analysis fields ─────────────────────────────────────────────────
     analysis_md = ""
@@ -128,6 +172,23 @@ def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> Vacanc
     if not warnings and db_warnings:
         warnings = db_warnings
 
+    # Primary source for blockers: analysis_json DB column (p2.key_barriers)
+    # Overrides file-parsed blockers when DB data is available
+    if db_analysis_json:
+        try:
+            aj = json.loads(db_analysis_json)
+            p2 = aj.get("p2", {})
+            kb = p2.get("key_barriers", [])
+            if kb:
+                if isinstance(kb, list):
+                    blockers = "; ".join(str(b) for b in kb if b)
+                elif isinstance(kb, str):
+                    blockers = kb
+            if not db_salary and p2.get("salary"):
+                db_salary = p2["salary"]
+        except Exception:
+            pass  # keep file-parsed values
+
     return VacancyView(
         id=vacancy_id,
         title=title,
@@ -144,7 +205,9 @@ def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> Vacanc
         has_cv=has_cv,
         has_cover=has_cover,
         has_pdf=has_pdf,
+        cv_pdf_url=cv_pdf_url,
         analysis_md=analysis_md,
+        salary=db_salary,
     )
 
 

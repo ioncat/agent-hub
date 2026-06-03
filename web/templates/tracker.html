@@ -1,68 +1,80 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
 <title>Vacancy Tracker</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='15' fill='%23F5C518'/><text x='16' y='21' font-family='Arial,sans-serif' font-size='10' font-weight='bold' fill='black' text-anchor='middle'>A-H</text></svg>">
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;background:#f4f4f5;color:#1a1a1a;padding:24px}
-  .wrap{max-width:1100px;margin:0 auto}
-  h1{font-size:17px;font-weight:600;margin-bottom:14px}
-  .controls{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-  .controls select,.controls input{padding:5px 9px;border:1px solid #d1d5db;border-radius:5px;font-size:13px;background:#fff}
-  table{width:100%;border-collapse:collapse;background:#fff;border-radius:7px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
-  th{background:#18181b;color:#fff;padding:8px 10px;text-align:left;cursor:pointer;white-space:nowrap;font-weight:500;font-size:12px;user-select:none}
-  th:hover{background:#27272a}
-  td{padding:7px 10px;border-bottom:1px solid #f0f0f0;vertical-align:top}
-  tr:last-child td{border-bottom:none}
-  tr:hover:not(.date-sep) td{background:#fafafa}
-  .rec-yes{border-left:3px solid #16a34a}
-  .rec-no{border-left:3px solid #dc2626;opacity:.65}
-  .track-flag{border-left:3px solid #f59e0b}
-  .track-chip{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;vertical-align:middle;cursor:default}
-  .warn-chip{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;vertical-align:middle;cursor:pointer}
-  .date-sep td{background:#e4e4e7;color:#52525b;font-weight:600;font-size:11px;padding:5px 10px;letter-spacing:.05em;border-bottom:2px solid #d4d4d8;border-top:2px solid #d4d4d8}
-  .vname{font-weight:500;max-width:280px}
-  .vname a{color:inherit;text-decoration:none;border-bottom:1px solid #d1d5db}
-  .vname a:hover{border-bottom-color:#1d4ed8;color:#1d4ed8}
-  .cat{color:#6b7280;font-size:12px;max-width:220px}
-  .fit{font-weight:600;white-space:nowrap;color:#1d4ed8}
-  .tick{color:#16a34a;font-weight:700}
-  .cross{color:#9ca3af}
-  .num{color:#9ca3af;font-size:11px;text-align:right;white-space:nowrap;width:28px}
-  .expand-btn{cursor:pointer;font-size:9px;color:#9ca3af;margin-left:4px;user-select:none}
-  .expand-btn:hover{color:#1d4ed8}
-  .expand-row td{padding:0;border-bottom:2px solid #e4e4e7}
-  .analysis-body{padding:16px 24px;max-height:500px;overflow-y:auto;font-size:13px;line-height:1.6}
-  .analysis-body h1,.analysis-body h2,.analysis-body h3{margin:14px 0 6px;font-weight:600}
-  .analysis-body h2{font-size:14px}.analysis-body h3{font-size:13px;color:#374151}
-  .analysis-body p{margin-bottom:8px}
-  .analysis-body ul,.analysis-body ol{padding-left:20px;margin-bottom:8px}
-  .analysis-body li{margin-bottom:3px}
-  .analysis-body table{width:auto;margin:8px 0;font-size:12px}
-  .analysis-body table td,.analysis-body table th{padding:4px 8px;border:1px solid #e4e4e7}
-  .analysis-body strong{font-weight:600}
-  .analysis-body code{background:#f4f4f5;padding:1px 4px;border-radius:3px;font-size:11px}
-  .analysis-body hr{border:none;border-top:1px solid #e4e4e7;margin:12px 0}
-  .updated{margin-top:10px;font-size:11px;color:#9ca3af}
-  .count{font-size:12px;color:#6b7280;align-self:center}
-  .warn-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center}
-  .warn-modal{background:#fff;border-radius:10px;padding:24px 28px;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.18);position:relative}
-  .warn-modal h3{font-size:14px;font-weight:600;margin-bottom:14px;color:#1e40af;padding-right:24px}
-  .warn-modal ul{list-style:none;padding:0;margin:0}
-  .warn-modal li{padding:8px 0 8px 22px;border-bottom:1px solid #f0f0f0;font-size:13px;line-height:1.5;position:relative}
-  .warn-modal li:last-child{border-bottom:none}
-  .warn-modal li::before{content:"⚠";position:absolute;left:0;color:#f59e0b;font-size:12px;top:9px}
-  .warn-close{position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#9ca3af;line-height:1;padding:0}
-  .warn-close:hover{color:#1a1a1a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;background:#f4f4f5;color:#1a1a1a;padding:24px}
+.wrap{max-width:1100px;margin:0 auto}
+h1{font-size:17px;font-weight:600;margin-bottom:14px}
+.controls{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.controls select,.controls input{padding:5px 9px;border:1px solid #d1d5db;border-radius:5px;font-size:13px;background:#fff}
+.btn-grp{padding:5px 10px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;background:#fff;cursor:pointer;white-space:nowrap;color:#374151}
+.btn-grp:hover{background:#f0f0f0;border-color:#9ca3af}
+.sep-ctrl{display:flex;gap:4px;margin-left:auto}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:7px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+th{background:#18181b;color:#fff;padding:8px 10px;text-align:left;cursor:pointer;white-space:nowrap;font-weight:500;font-size:12px;user-select:none}
+th:hover{background:#27272a}
+td{padding:7px 10px;border-bottom:1px solid #f0f0f0;vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover:not(.date-sep) td{background:#fafafa}
+.rec-yes{border-left:3px solid #16a34a}
+.rec-no{border-left:3px solid #dc2626;opacity:.65}
+.rec-consider{border-left:3px solid #f59e0b}
+.warn-chip{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;vertical-align:middle;cursor:pointer}
+.date-sep{cursor:pointer;user-select:none}
+.date-sep td{background:#e4e4e7;color:#52525b;font-weight:600;font-size:11px;padding:5px 10px;letter-spacing:.05em;border-bottom:2px solid #d4d4d8;border-top:2px solid #d4d4d8}
+.date-sep:hover td{background:#d4d4d8}
+.grp-icon{font-size:9px;margin-right:5px;display:inline-block;width:10px;color:#9ca3af}
+.vname{font-weight:500;max-width:280px}
+.vname a{color:inherit;text-decoration:none;border-bottom:1px solid #d1d5db}
+.vname a:hover{border-bottom-color:#1d4ed8;color:#1d4ed8}
+.cat{color:#6b7280;font-size:12px;max-width:220px}
+.fit{font-weight:600;white-space:nowrap;color:#1d4ed8}
+.tick{color:#16a34a;font-weight:700}
+.cross{color:#9ca3af}
+.num{color:#9ca3af;font-size:11px;text-align:right;white-space:nowrap;width:28px}
+.expand-btn{cursor:pointer;font-size:9px;color:#9ca3af;margin-left:4px;user-select:none}
+.expand-btn:hover{color:#1d4ed8}
+.expand-row td{padding:0;border-bottom:2px solid #e4e4e7}
+.analysis-body{padding:16px 24px;max-height:500px;overflow-y:auto;font-size:13px;line-height:1.6}
+.analysis-body h1,.analysis-body h2,.analysis-body h3{margin:14px 0 6px;font-weight:600}
+.analysis-body h2{font-size:14px}.analysis-body h3{font-size:13px;color:#374151}
+.analysis-body p{margin-bottom:8px}
+.analysis-body ul,.analysis-body ol{padding-left:20px;margin-bottom:8px}
+.analysis-body li{margin-bottom:3px}
+.analysis-body table{width:auto;margin:8px 0;font-size:12px}
+.analysis-body table td,.analysis-body table th{padding:4px 8px;border:1px solid #e4e4e7}
+.analysis-body strong{font-weight:600}
+.analysis-body code{background:#f4f4f5;padding:1px 4px;border-radius:3px;font-size:11px}
+.analysis-body hr{border:none;border-top:1px solid #e4e4e7;margin:12px 0}
+.updated{margin-top:10px;font-size:11px;color:#9ca3af}
+.count{font-size:12px;color:#6b7280;align-self:center}
+.warn-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center}
+.warn-modal{background:#fff;border-radius:10px;padding:24px 28px;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.18);position:relative}
+.warn-modal h3{font-size:14px;font-weight:600;margin-bottom:14px;color:#1e40af;padding-right:24px}
+.warn-modal ul{list-style:none;padding:0;margin:0}
+.warn-modal li{padding:8px 0 8px 22px;border-bottom:1px solid #f0f0f0;font-size:13px;line-height:1.5;position:relative}
+.warn-modal li:last-child{border-bottom:none}
+.warn-modal li::before{content:"⚠";position:absolute;left:0;color:#f59e0b;font-size:12px;top:9px}
+.warn-close{position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#9ca3af;line-height:1;padding:0}
+.warn-close:hover{color:#1a1a1a}
+.site-chip{display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;margin-right:5px;vertical-align:middle;white-space:nowrap}
+.site-djinni{background:#e0f2fe;color:#0369a1}
+.site-dou{background:#dcfce7;color:#166534}
+.site-linkedin{background:#dbeafe;color:#1e40af}
+.site-other,.site-{background:#f3f4f6;color:#6b7280}
+.salary-badge{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:10px;font-size:11px;background:#d1fae5;color:#065f46;font-weight:600}
+.barriers-cell{max-width:220px;vertical-align:top;font-size:11px;color:#374151;line-height:1.5}
 </style>
 </head>
 <body>
 <div id="warn-overlay" class="warn-overlay" style="display:none" onclick="closeWarn(event)">
   <div class="warn-modal">
     <button class="warn-close" onclick="closeWarn()">×</button>
-    <h3>⚑ Warnings</h3>
+    <h3>⚑ Предупреждения</h3>
     <ul id="warn-list"></ul>
   </div>
 </div>
@@ -70,124 +82,219 @@
 <h1>Vacancy Tracker</h1>
 <div class="controls">
   <select id="f-user" onchange="filterUser(this.value)">
-    <option value="">All users</option>
+    <option value="">Все пользователи</option>
     {% for u in users %}
     <option value="{{ u.id }}" {% if selected_user_id == u.id %}selected{% endif %}>{{ u.name or 'User ' ~ u.id }}</option>
     {% endfor %}
   </select>
+  <select id="f-site" onchange="filter()">
+    <option value="">Все источники</option>
+    <option value="djinni">Djinni</option>
+    <option value="dou">DOU</option>
+    <option value="linkedin">LinkedIn</option>
+    <option value="other">Other</option>
+  </select>
   <select id="f-rec" onchange="filter()">
     <option value="">All</option>
-    <option value="rec-yes">✅ Подавать</option>
-    <option value="rec-no">❌ Не подавать</option>
+    <option value="rec-yes">✅ Apply</option>
+    <option value="rec-consider">⚠️ Take a chance</option>
+    <option value="rec-no">❌ Decline</option>
   </select>
-  <input id="f-text" type="search" placeholder="Search…" oninput="filter()" style="width:200px">
+  <input id="f-text" type="search" placeholder="Поиск…" oninput="filter()" style="width:180px">
   <span class="count" id="count"></span>
+  <div class="sep-ctrl">
+    <button class="btn-grp" onclick="expandAll()">Развернуть всё</button>
+    <button class="btn-grp" onclick="collapseAll()">Свернуть всё</button>
+  </div>
 </div>
 <table>
   <thead>
     <tr>
       <th style="width:28px">#</th>
-      <th onclick="sort(1)">Vacancy</th>
-      <th onclick="sort(2)">Fit</th>
-      <th>Rec</th>
-      <th>Category</th>
-      <th>Analysis</th>
+      <th onclick="sort(1)">Вакансия</th>
+      <th onclick="sort(2)">Фит</th>
+      <th>Рекоменд.</th>
+      <th>Категория</th>
+      <th>Барьеры</th>
+      <th>Анализ</th>
       <th>CV</th>
-      <th>Cover</th>
-      <th>PDF</th>
+      <th>Кавер</th>
     </tr>
   </thead>
   <tbody id="tbody">
   {% set ns = namespace(last_date='') %}
   {% for v in vacancies %}
     {% if v.date != ns.last_date %}
-    <tr class="date-sep"><td colspan="9">{{ v.date }}</td></tr>
+    <tr class="date-sep" data-group-date="{{ v.date }}">
+      <td colspan="9"><span class="grp-icon" data-type="date" data-date="{{ v.date }}">▼</span>{{ v.date }}</td>
+    </tr>
     {% set ns.last_date = v.date %}
     {% endif %}
-    <tr class="{{ v.rec_class }}" data-idx="{{ v.id }}">
-      <td class="num">{{ v.id }}<span class="expand-btn" onclick="toggleExpand({{ v.id }},this)" title="Show analysis">▶</span></td>
-      <td class="vname"><a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a></td>
+    <tr class="{{ v.rec_class }}" data-idx="{{ v.id }}" data-site="{{ v.site or '' }}" data-date="{{ v.date }}">
+      <td class="num">{{ v.id }}<span class="expand-btn" data-expand="{{ v.id }}" title="Показать анализ">▶</span></td>
+      <td class="vname"><span class="site-chip site-{{ v.site or 'other' }}">{{ v.site_display }}</span><a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a></td>
       <td class="fit">{{ v.fit_score }}</td>
-      <td>
-        {{ v.recommendation }}
-        {% if v.warn_count > 0 %}<span class="warn-chip" onclick="showWarn('{{ v.warn_text_escaped }}')">⚠ {{ v.warn_count }}</span>{% endif %}
-      </td>
-      <td class="cat">{{ v.category }}</td>
+      <td>{% if v.rec_class == 'rec-yes' %}✅{% elif v.rec_class == 'rec-no' %}❌{% elif v.rec_class == 'rec-consider' %}⚠️{% endif %} {{ v.recommendation }}{% if v.warn_count > 0 %}<span class="warn-chip" data-warn="{{ v.warn_text_escaped }}">⚠ {{ v.warn_count }}</span>{% endif %}</td>
+      <td class="cat">{{ v.category }}{% if v.salary %} <span class="salary-badge">{{ v.salary }}</span>{% endif %}</td>
+      <td class="barriers-cell">{% if v.barriers_list %}{% for b in v.barriers_list %}{{ b }}{% if not loop.last %} · {% endif %}{% endfor %}{% else %}<span class="cross">—</span>{% endif %}</td>
       <td>{% if v.has_analysis %}<span class="tick">✓</span>{% else %}<span class="cross">—</span>{% endif %}</td>
-      <td>{% if v.has_cv %}<span class="tick">✓</span>{% else %}<span class="cross">—</span>{% endif %}</td>
+      <td>{% if v.has_pdf %}<a href="{{ v.cv_pdf_url }}" target="_blank" class="tick" style="text-decoration:none" title="Открыть CV PDF">✓</a>{% else %}<span class="cross">—</span>{% endif %}</td>
       <td>{% if v.has_cover %}<span class="tick">✓</span>{% else %}<span class="cross">—</span>{% endif %}</td>
-      <td>{% if v.has_pdf %}<span class="tick">✓</span>{% else %}<span class="cross">—</span>{% endif %}</td>
     </tr>
     <tr class="expand-row" data-for="{{ v.id }}" style="display:none">
       <td colspan="9">
         <div class="analysis-body">
-          {% if v.has_analysis %}{{ v.analysis_md | markdown | safe }}{% else %}<em>No analysis yet.</em>{% endif %}
+          {% if v.has_analysis %}{{ v.analysis_md | markdown | safe }}{% else %}<em>Анализ отсутствует.</em>{% endif %}
         </div>
       </td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
-<p class="updated">Total: {{ total }} vacancies</p>
+<p class="updated">Всего: {{ total }} вакансий · <a href="/stats/barriers" target="_blank" style="color:#5b21b6;text-decoration:none;font-size:11px">📊 Анализ барьеров</a></p>
 </div>
 <script>
-let dir={};
-function showWarn(text){
-  const items=text.split(';').map(s=>s.trim()).filter(Boolean);
-  document.getElementById('warn-list').innerHTML=items.map(s=>`<li>${s}</li>`).join('');
-  document.getElementById('warn-overlay').style.display='flex';
+// ── Group state ──────────────────────────────────────────────────────────────
+const dateState = {}; // date → true (collapsed)
+let   sortActive = false;
+
+// ── Core visibility ──────────────────────────────────────────────────────────
+function rowMatchesFilter(row) {
+  const rec  = document.getElementById('f-rec').value;
+  const site = document.getElementById('f-site').value;
+  const txt  = document.getElementById('f-text').value.toLowerCase();
+  return (!rec  || row.classList.contains(rec))
+      && (!site || row.dataset.site === site)
+      && (!txt  || row.textContent.toLowerCase().includes(txt));
 }
-function closeWarn(e){
-  if(!e||e.target===document.getElementById('warn-overlay'))
-    document.getElementById('warn-overlay').style.display='none';
-}
-document.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('warn-overlay').style.display='none';});
-function toggleExpand(idx,btn){
-  const row=document.querySelector(`tr[data-for="${idx}"]`);
-  if(!row)return;
-  const open=row.style.display!=='none';
-  row.style.display=open?'none':'';
-  btn.textContent=open?'▶':'▼';
-}
-function sort(c){
-  document.querySelectorAll('.expand-row').forEach(r=>{r.style.display='none';});
-  document.querySelectorAll('.expand-btn').forEach(b=>{b.textContent='▶';});
-  const tb=document.getElementById('tbody');
-  const mainRows=[...tb.querySelectorAll('tr[data-idx]')];
-  dir[c]=!dir[c];
-  mainRows.sort((a,b)=>{
-    let av=a.cells[c].textContent.trim(),bv=b.cells[c].textContent.trim();
-    if(c===2){av=parseFloat(av)||0;bv=parseFloat(bv)||0;return dir[c]?bv-av:av-bv;}
-    return dir[c]?bv.localeCompare(av,'uk'):av.localeCompare(bv,'uk');
+
+function applyViz() {
+  const mainRows = [...document.querySelectorAll('#tbody tr[data-idx]')];
+  let visible = 0;
+
+  mainRows.forEach(row => {
+    const d = row.dataset.date;
+    const groupHidden = !sortActive && dateState[d];
+    const show = !groupHidden && rowMatchesFilter(row);
+    row.style.display = show ? '' : 'none';
+    const exp = document.querySelector(`tr[data-for="${row.dataset.idx}"]`);
+    if (exp && !show) exp.style.display = 'none';
+    if (show) visible++;
   });
-  mainRows.forEach(r=>{
+
+  if (!sortActive) {
+    // Date separators
+    document.querySelectorAll('#tbody tr.date-sep').forEach(sep => {
+      const d = sep.dataset.groupDate;
+      const hasContent = mainRows.some(r => r.dataset.date === d && rowMatchesFilter(r));
+      sep.style.display = hasContent ? '' : 'none';
+    });
+    // Toggle icons
+    document.querySelectorAll('.grp-icon[data-type="date"]').forEach(b => {
+      b.textContent = dateState[b.dataset.date] ? '▶' : '▼';
+    });
+  } else {
+    document.querySelectorAll('#tbody tr.date-sep').forEach(r => r.style.display='none');
+  }
+
+  document.getElementById('count').textContent = visible + ' вакансий';
+}
+
+// ── Event delegation ─────────────────────────────────────────────────────────
+document.getElementById('tbody').addEventListener('click', function(e) {
+  const warnChip = e.target.closest('.warn-chip');
+  if (warnChip) {
+    e.stopPropagation();
+    showWarn(warnChip.dataset.warn);
+    return;
+  }
+  const expandBtn = e.target.closest('.expand-btn');
+  if (expandBtn) {
+    e.stopPropagation();
+    const idx = expandBtn.dataset.expand;
+    const row = document.querySelector(`tr[data-for="${idx}"]`);
+    if (!row) return;
+    const open = row.style.display !== 'none';
+    row.style.display = open ? 'none' : '';
+    expandBtn.textContent = open ? '▶' : '▼';
+    return;
+  }
+  const dateSep = e.target.closest('tr.date-sep');
+  if (dateSep) {
+    const d = dateSep.dataset.groupDate;
+    dateState[d] = !dateState[d];
+    applyViz();
+  }
+});
+
+// ── Group controls ───────────────────────────────────────────────────────────
+function expandAll() {
+  sortActive = false;
+  Object.keys(dateState).forEach(k => dateState[k] = false);
+  applyViz();
+}
+
+function collapseAll() {
+  sortActive = false;
+  document.querySelectorAll('#tbody tr.date-sep').forEach(sep => {
+    dateState[sep.dataset.groupDate] = true;
+  });
+  applyViz();
+}
+
+// ── Sort ─────────────────────────────────────────────────────────────────────
+let dir = {};
+function sort(c) {
+  document.querySelectorAll('.expand-row').forEach(r => r.style.display = 'none');
+  document.querySelectorAll('.expand-btn').forEach(b => b.textContent = '▶');
+  const tb = document.getElementById('tbody');
+  const mainRows = [...tb.querySelectorAll('tr[data-idx]')];
+  dir[c] = !dir[c];
+  mainRows.sort((a, b) => {
+    let av = a.cells[c].textContent.trim(), bv = b.cells[c].textContent.trim();
+    if (c === 2) { av = parseFloat(av) || 0; bv = parseFloat(bv) || 0; return dir[c] ? bv - av : av - bv; }
+    return dir[c] ? bv.localeCompare(av, 'uk') : av.localeCompare(bv, 'uk');
+  });
+  mainRows.forEach(r => {
     tb.appendChild(r);
-    const exp=tb.querySelector(`tr[data-for="${r.dataset.idx}"]`);
-    if(exp)tb.appendChild(exp);
+    const exp = tb.querySelector(`tr[data-for="${r.dataset.idx}"]`);
+    if (exp) tb.appendChild(exp);
   });
+  sortActive = true;
+  applyViz();
 }
-function filterUser(uid){
-  const url=new URL(window.location.href);
-  if(uid){url.searchParams.set('user_id',uid);}else{url.searchParams.delete('user_id');}
-  window.location.href=url.toString();
+
+// ── Filter / user ─────────────────────────────────────────────────────────────
+function filterUser(uid) {
+  const url = new URL(window.location.href);
+  if (uid) { url.searchParams.set('user_id', uid); } else { url.searchParams.delete('user_id'); }
+  window.location.href = url.toString();
 }
-function filter(){
-  const rec=document.getElementById('f-rec').value;
-  const txt=document.getElementById('f-text').value.toLowerCase();
-  localStorage.setItem('f-rec',rec);
-  let n=0;
-  document.querySelectorAll('#tbody tr[data-idx]').forEach(r=>{
-    const show=(!rec||r.classList.contains(rec))&&(!txt||r.textContent.toLowerCase().includes(txt));
-    r.style.display=show?'':'none';
-    const exp=document.querySelector(`tr[data-for="${r.dataset.idx}"]`);
-    if(exp&&!show)exp.style.display='none';
-    if(show)n++;
-  });
-  document.querySelectorAll('#tbody tr.date-sep').forEach(r=>r.style.display='');
-  document.getElementById('count').textContent=n+' entries';
+
+function filter() {
+  localStorage.setItem('f-rec',  document.getElementById('f-rec').value);
+  localStorage.setItem('f-site', document.getElementById('f-site').value);
+  applyViz();
 }
-(function(){const s=localStorage.getItem('f-rec');if(s)document.getElementById('f-rec').value=s;})();
-filter();
+
+// ── Warn modal ────────────────────────────────────────────────────────────────
+function showWarn(text) {
+  const items = text.split(';').map(s => s.trim()).filter(Boolean);
+  document.getElementById('warn-list').innerHTML = items.map(s => `<li>${s}</li>`).join('');
+  document.getElementById('warn-overlay').style.display = 'flex';
+}
+function closeWarn(e) {
+  if (!e || e.target === document.getElementById('warn-overlay'))
+    document.getElementById('warn-overlay').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('warn-overlay').style.display = 'none'; });
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(function() {
+  const s = localStorage.getItem('f-rec');  if (s) document.getElementById('f-rec').value  = s;
+  const t = localStorage.getItem('f-site'); if (t) document.getElementById('f-site').value = t;
+  applyViz();
+})();
 </script>
 </body>
 </html>

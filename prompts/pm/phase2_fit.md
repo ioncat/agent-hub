@@ -35,20 +35,20 @@ Output this block exactly as shown, filling in the placeholders.
 
 ## Quick Scan
 **Fit score:** X/10
-**Recommendation:** подавать / подавать с адаптацией / не подавать
+**Recommendation:** apply / take a chance / decline
 **Category:** [Primary archetype from Phase 1 section 1.4] · [Remote / On-site / Hybrid]
 **Who they want:** [1 sentence — the ideal candidate archetype this vacancy targets]
 
-**Key Barriers:** нет / [hard gaps between JD requirements and candidate — name the gap and the evidence]
+**Key Barriers:** нет / [semicolon-separated short labels: "gap1; gap2; gap3" — max 5 words each, name the competency/tool/metric gap directly, e.g. "A/B testing; consumer product; PSP/POS integrations; MRR/CAC/LTV"]
 **Hidden Risks:** нет / [contextual risks from role/company — NOT candidate gaps]
 **Warnings:** нет / [application process risks only — see rules below]
 
 ---
 
 **Recommendation rules (pick exactly one):**
-- **подавать** — score ≥ 7, no hard blockers, candidate profile directly matches JD archetype
-- **подавать с адаптацией** — score 4–6, gaps exist but bridgeable with reframing; candidate has transferable evidence
-- **не подавать** — score < 4 OR any hard blocker present
+- **apply** — score ≥ 7, no hard blockers, candidate profile directly matches JD archetype
+- **take a chance** — score 4–6, gaps exist but bridgeable with reframing; candidate has transferable evidence
+- **decline** — score < 4 OR any hard blocker present
 
 **Fit score guidance — be critical, start from neutral:**
 - Baseline: 5.0
@@ -75,7 +75,7 @@ Output this block exactly as shown, filling in the placeholders.
 - Role may expand rapidly beyond stated scope
 - Domain the company is pivoting into (candidate unfamiliar territory for the company too)
 
-**Blockers** (hard knockout — automatically sets Recommendation to "не подавать"):
+**Blockers** (hard knockout — automatically sets Recommendation to "decline"):
 - Mandatory relocation without remote option
 - Hard domain requirement the candidate lacks
 - Mandatory language threshold with verification (C1+ test)
@@ -129,12 +129,12 @@ Skip boilerplate requirements (teamwork, communication, responsibility). Focus o
 
 ## Adaptation Plan
 
-**If Recommendation is "не подавать":**
+**If Recommendation is "decline":**
 
 List 2–3 structural reasons why this vacancy is not worth the time investment.
 Focus on gaps that cannot be bridged with reframing alone.
 
-**If Recommendation is "подавать" or "подавать с адаптацией":**
+**If Recommendation is "apply" or "take a chance":**
 
 Provide 3–5 concrete reframing actions. Each action = specific and actionable.
 

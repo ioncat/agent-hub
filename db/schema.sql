@@ -39,6 +39,12 @@ CREATE TABLE IF NOT EXISTS vacancies (
                                           -- fetched | analyzing | analyzed | generating | done | error
     warnings      TEXT    NOT NULL DEFAULT '',
                                           -- semicolon-separated soft flags (imported from tracker or analysis)
+    salary        TEXT,                   -- e.g. "$4500" or "3000–4500 USD"
+    analysis_json TEXT,                   -- structured pipeline data per phase:
+                                          -- {"p1":{company_type,role_archetype,role_balance,autonomy,dominant_culture},
+                                          --  "p2":{fit_score,recommendation,category,key_barriers[],hidden_risks[],warnings[],salary,fit_dimensions{}},
+                                          --  "p3":{name_variant,cv_language,changes_count},
+                                          --  "p4":{cover_language}}
     created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 );

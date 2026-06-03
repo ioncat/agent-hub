@@ -14,11 +14,13 @@ Usage:
         ...
 """
 
+import json
 import logging
 import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
+from urllib.parse import urlparse, urlunparse
 
 import aiosqlite
 
@@ -35,6 +37,51 @@ def configure(db_path: str | Path) -> None:
     """Set DB path before first call to init_db(). Called from agent.py on startup."""
     global _db_path
     _db_path = Path(db_path)
+
+
+def normalize_url(url: str) -> str:
+    """Return canonical URL for dedup: lowercase host, strip query/fragment/trailing slash.
+
+    Job board IDs are always in the path (Djinni, DOU, LinkedIn) — query params
+    are only tracking noise (utm_source, trk, refId, pk_campaign, etc.).
+    Stripping the entire query string is safe for all supported boards.
+
+    Examples:
+        https://jobs.dou.ua/vacancies/123/?utm_source=jobsrss  →  https://jobs.dou.ua/vacancies/123
+        https://linkedin.com/jobs/view/456/?trk=abc&refId=xyz  →  https://linkedin.com/jobs/view/456
+        https://djinni.co/jobs/789/?ref=tg_bot                 →  https://djinni.co/jobs/789
+    """
+    stripped = url.strip()
+    if not stripped:
+        return stripped
+    try:
+        p = urlparse(stripped)
+        # Normalise: lowercase scheme+host, strip path trailing slash, drop query+fragment
+        path = p.path.rstrip("/") or "/"
+        return urlunparse((p.scheme.lower(), p.netloc.lower(), path, "", "", ""))
+    except Exception:
+        return stripped
+
+
+def extract_site(url: str) -> str:
+    """Infer site identifier from URL hostname.
+
+    Returns: 'djinni' | 'dou' | 'linkedin' | 'hh' | 'other'
+    Used when inserting local-mode vacancies that have no explicit site argument.
+    """
+    try:
+        host = urlparse(url).netloc.lower()
+    except Exception:
+        return "other"
+    if "djinni" in host:
+        return "djinni"
+    if "dou.ua" in host:
+        return "dou"
+    if "linkedin" in host:
+        return "linkedin"
+    if "hh.ua" in host or "hh.ru" in host:
+        return "hh"
+    return "other"
 
 
 async def init_db() -> None:
@@ -56,10 +103,13 @@ async def init_db() -> None:
             "ALTER TABLE llm_usage ADD COLUMN elapsed_ms      INTEGER NOT NULL DEFAULT 0",
             # Multi-user: user_id FK (nullable — existing rows remain valid, NULL = user_id=1)
             "ALTER TABLE vacancies ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
+            "ALTER TABLE vacancies ADD COLUMN salary TEXT",
             "ALTER TABLE llm_usage ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
             # EPIC-17: onboarding profile storage
             "ALTER TABLE users ADD COLUMN profile_json TEXT",
             "ALTER TABLE users ADD COLUMN onboarding_step TEXT",
+            # Structured pipeline data per phase (component-based CV assembly foundation)
+            "ALTER TABLE vacancies ADD COLUMN analysis_json TEXT",
         ]:
             try:
                 await db.execute(migration)
@@ -221,10 +271,14 @@ async def insert_vacancy(
 ) -> int:
     """Insert new vacancy. Returns new row id.
 
+    URL is normalised before insert (tracking params stripped, host lowercased).
+    site is auto-inferred from URL hostname when not provided.
     user_id: optional FK to users table. NULL = legacy/unscoped (treated as user_id=1).
     status: if provided, sets initial status (e.g. 'queued' for webhook-created vacancies).
-    Raises sqlite3.IntegrityError if URL already exists — caller should handle.
+    Raises sqlite3.IntegrityError if normalised URL already exists — caller should handle.
     """
+    canonical_url = normalize_url(url)
+    resolved_site = site or extract_site(canonical_url)
     async with get_db() as db:
         if status is not None:
             cursor = await db.execute(
@@ -232,7 +286,7 @@ async def insert_vacancy(
                 INSERT INTO vacancies (url, title, site, markdown_path, user_id, status)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (url, title, site, markdown_path, user_id, status),
+                (canonical_url, title, resolved_site, markdown_path, user_id, status),
             )
         else:
             cursor = await db.execute(
@@ -240,7 +294,7 @@ async def insert_vacancy(
                 INSERT INTO vacancies (url, title, site, markdown_path, user_id)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (url, title, site, markdown_path, user_id),
+                (canonical_url, title, resolved_site, markdown_path, user_id),
             )
         await db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
@@ -251,6 +305,7 @@ async def update_vacancy_fields(
     title: str | None = None,
     site: str | None = None,
     markdown_path: str | None = None,
+    salary: str | None = None,
 ) -> None:
     """Update mutable fields of an existing vacancy (e.g. after fetching a queued record).
 
@@ -267,6 +322,9 @@ async def update_vacancy_fields(
     if markdown_path is not None:
         sets.append("markdown_path = ?")
         params.append(markdown_path)
+    if salary is not None:
+        sets.append("salary = ?")
+        params.append(salary)
     if not sets:
         return
     params.append(vacancy_id)
@@ -279,10 +337,16 @@ async def update_vacancy_fields(
 
 
 async def get_vacancy_by_url(url: str) -> aiosqlite.Row | None:
-    """Return vacancy row by URL or None if not found."""
+    """Return vacancy row by URL or None if not found.
+
+    Matches against both the normalised URL and the original URL to handle
+    legacy rows that were inserted before URL normalisation was added.
+    """
+    canonical = normalize_url(url)
     async with get_db() as db:
         cursor = await db.execute(
-            "SELECT * FROM vacancies WHERE url = ?", (url,)
+            "SELECT * FROM vacancies WHERE url = ? OR url = ?",
+            (canonical, url),
         )
         return await cursor.fetchone()
 
@@ -294,6 +358,34 @@ async def get_vacancy_by_id(vacancy_id: int) -> aiosqlite.Row | None:
             "SELECT * FROM vacancies WHERE id = ?", (vacancy_id,)
         )
         return await cursor.fetchone()
+
+
+async def patch_analysis_json(vacancy_id: int, phase: str, data: dict) -> None:
+    """Merge phase data into analysis_json.
+
+    Reads current JSON, sets analysis_json[phase] = data, writes back.
+    Idempotent — repeated calls for same phase overwrite previous value.
+
+    phase: "p1" | "p2" | "p3" | "p4"
+    data: dict with phase-specific fields (see schema.sql comment for shape)
+    """
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT analysis_json FROM vacancies WHERE id = ?", (vacancy_id,)
+        )
+        row = await cur.fetchone()
+        existing: dict = {}
+        if row and row["analysis_json"]:
+            try:
+                existing = json.loads(row["analysis_json"])
+            except Exception:
+                existing = {}
+        existing[phase] = data
+        await db.execute(
+            "UPDATE vacancies SET analysis_json = ?, updated_at = datetime('now') WHERE id = ?",
+            (json.dumps(existing, ensure_ascii=False), vacancy_id),
+        )
+        await db.commit()
 
 
 async def update_vacancy_warnings(vacancy_id: int, warnings: str) -> None:

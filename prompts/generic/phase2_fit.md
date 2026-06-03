@@ -35,7 +35,7 @@ Output this block exactly as shown, filling in the placeholders.
 
 ## Quick Scan
 **Fit score:** X/10
-**Recommendation:** подавать / подавать с адаптацией / не подавать
+**Recommendation:** apply / take a chance / decline
 **Category:** [Primary role type from Phase 1 section 1.4] · [Remote / On-site / Hybrid]
 **Who they want:** [1 sentence — the ideal candidate this vacancy targets]
 
@@ -46,9 +46,9 @@ Output this block exactly as shown, filling in the placeholders.
 ---
 
 **Recommendation rules (pick exactly one):**
-- **подавать** — score ≥ 7, no hard blockers, candidate profile directly matches role requirements
-- **подавать с адаптацией** — score 4–6, gaps exist but bridgeable with reframing; candidate has transferable evidence
-- **не подавать** — score < 4 OR any hard blocker present
+- **apply** — score ≥ 7, no hard blockers, candidate profile directly matches role requirements
+- **take a chance** — score 4–6, gaps exist but bridgeable with reframing; candidate has transferable evidence
+- **decline** — score < 4 OR any hard blocker present
 
 **Fit score guidance — be critical, start from neutral:**
 - Baseline: 5.0
@@ -71,7 +71,7 @@ Output this block exactly as shown, filling in the placeholders.
 - Role scope may expand rapidly beyond stated description
 - Domain or industry the company is entering (unfamiliar territory for everyone)
 
-**Blockers** (hard knockout — automatically sets Recommendation to "не подавать"):
+**Blockers** (hard knockout — automatically sets Recommendation to "decline"):
 - Mandatory relocation without remote option
 - Hard domain or certification requirement the candidate lacks
 - Mandatory language threshold with verification (C1+ test)
@@ -125,12 +125,12 @@ Skip boilerplate requirements (teamwork, communication, responsibility). Focus o
 
 ## Adaptation Plan
 
-**If Recommendation is "не подавать":**
+**If Recommendation is "decline":**
 
 List 2–3 structural reasons why this vacancy is not worth the time investment.
 Focus on gaps that cannot be bridged with reframing alone.
 
-**If Recommendation is "подавать" or "подавать с адаптацией":**
+**If Recommendation is "apply" or "take a chance":**
 
 Provide 3–5 concrete reframing actions. Each action = specific and actionable.
 
