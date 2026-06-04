@@ -43,10 +43,13 @@ config/profile.yaml
 vacancies/
 # runtime file from job-board-monitor / emit_vacancy.py
 seen_jobs.json
-# SQLite runtime DB — not versioned
+# SQLite runtime DB and backups — not versioned
 *.db
 *.sqlite
 *.sqlite3
+*.db.backup*
+*.db-shm
+*.db-wal
 
 # Internal dev guidelines and discovery docs (not for public repos)
 CLAUDE.md
@@ -64,6 +67,9 @@ fonts/
 
 # Windows OS junk
 *.lnk
+
+# Claude Code local config (launch settings, not project config)
+.claude/launch.json
 
 # Chat logs / Q&A notes (local only)
 *Q&A*.md
