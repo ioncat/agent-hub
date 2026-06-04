@@ -16,6 +16,24 @@ User will provide:
 
 ---
 
+## Cover Purpose — Why HR Opens the CV
+
+The cover message has one job: give the hiring manager a reason to open the CV.
+
+Most applicants are generic candidates. The HM's first screening question is: **"Is this person in the right category?"** The cover must answer that in the first sentence — before they decide to scroll past.
+
+**Three-element formula (always, in this order):**
+
+1. **Category signal** — immediately establish you've done this type of work. Not "X years of experience" — that's generic. Name the specific category the vacancy is hiring for and claim it directly with your strongest evidence.
+
+2. **Pain recognition** — mirror their specific organisational pain in your own words. Show you understand the context: who the stakeholders are, what's broken, what they're trying to fix. One sentence. No JD phrases verbatim.
+
+3. **One metric without full context** — a result that creates a gap. The number lands, but the story is in the CV. This makes them want to open it.
+
+**The cover is NOT a CV summary.** It does not need to cover everything. It needs to create the impulse: *"this sounds relevant — I want to see more."*
+
+---
+
 ## Rules (NON-NEGOTIABLE)
 
 - **Short** — greeting + body + closing line + name. Nothing more.

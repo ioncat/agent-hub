@@ -78,6 +78,16 @@ CERTIFICATIONS                   ← include only if directly relevant; omit oth
 
 ---
 
+## Primary Asset vs. Supporting Roles
+
+Before drafting, identify which 1–2 roles are the **primary asset** for this vacancy — the roles most directly matching the core JD requirement.
+
+For the primary asset role(s): lead with vocabulary, metrics, and framing that directly match the JD's main requirement.
+
+For all other (supporting) roles: do NOT force the primary keyword where it doesn't belong. Instead, find what secondary JD requirement each supporting role can address — even a small, honest signal compounds the overall CV effect. Every role has a job.
+
+---
+
 ## Tailoring Logic
 
 Based on role type from Phase 1 (section 1.3–1.4):

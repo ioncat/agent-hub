@@ -46,6 +46,41 @@ Do not skip. Do not add extra text. One line per field.
 
 ---
 
+### 1.0.5 North Star
+
+**Before any other analysis — find the single outcome this company is paying for.**
+
+**Method:**
+1. Strip the JD of all tools, skills, qualifications, and requirements
+2. Ask: *"What result is this company actually buying?"*
+3. Express as ONE sentence: `[role] must [action] so that [business outcome]`
+4. Map every major JD requirement as an instrument/path toward this North Star
+5. Build a tree:
+
+```
+[North Star]
+├── [sub-goal 1] — [which JD requirements serve this]
+├── [sub-goal 2] — [which JD requirements serve this]
+└── [sub-goal 3] — [which JD requirements serve this]
+```
+
+**Output:**
+```
+**North Star:** [one sentence]
+
+**Sub-goals:**
+├── [label] — [requirements that serve it]
+├── [label] — [requirements that serve it]
+└── [label] — [requirements that serve it]
+```
+
+This North Star drives everything downstream:
+- Phase 2: fit assessment maps candidate to each sub-goal branch
+- Phase 3: CV leads with the branch where candidate is strongest
+- Phase 4: cover opens by acknowledging the North Star outcome
+
+---
+
 ### 1.1 Company Pain Points
 
 Reconstruct what is actually broken, overloaded, or missing:
