@@ -1,8 +1,30 @@
 # career-agent — Backlog
 
-> Last updated: 2026-06-02
+> Last updated: 2026-06-04 (2nd session)
 > Epic format: post-pivot epics (13+) live in `docs/delivery/epics/`. This file = priority tracker + status overview.
 > Pre-pivot epics (1–12): `docs/delivery/epics-archive/EPIC-01-12-pre-pivot.md`
+
+---
+
+## 🔴 P0 — Deterministic PDF templating (TOMORROW, 2026-06-05)
+
+**Goal:** Replace ad-hoc generative PDF rendering with **deterministic Python/HTML templating**. Content slots into a fixed template that predictably and uniformly produces correct PDF layout — always, without errors.
+
+**Why:** Current `services/pdf/render.py` `render_md()` is line-by-line ad-hoc parsing → fragile. This session alone surfaced two layout bugs: cover text forced into CV name/headline/contacts blocks (overflow, no wrap) and contacts-line inconsistency. Each fix is a patch on a brittle parser.
+
+**Approach (to decide):** HTML/Jinja2 template + headless renderer (WeasyPrint?) OR structured fpdf2 template with explicit CV-template + cover-template. Content = typed sections (name, headline, contacts, summary, experience[], certifications / cover body) slotted in. No guessing from raw markdown line shapes.
+
+**Acceptance:** CV (EN/UA) + cover render identically every run; no overflow, no misparse; one template per doc type.
+
+---
+
+## ✅ P1 — Pipeline hardening (2026-06-04, 2nd session)
+
+- `scripts/inbox_scan.py` — canonical recursive inbox scanner (title + Source URL parse, dedup vs `inbox/{user_id}/*/JD.md`, `raw_folder`, `--json`). Root cause: non-recursive `ls` missed folder-based drops → false "inbox empty". Both `SKILL.md` + `analyze.md` now mandate it.
+- `/analyze` Step 0 → combined two-block menu (profile/mode + inbox), vertical-split columns, no round-trip.
+- `services/pdf/render.py` — `render_md` now **cover-aware**: CV-header parsing only when a contacts-links line is present in first lines; else render as wrapped body. Fixes cover overflow.
+- `prompts/pm/phase3_cv_draft.md` — CV contacts line fixed verbatim: `Email · Telegram · LinkedIn · ioncat.github.io` (LinkedIn always, no GitHub).
+- `SKILL.md` PDF section + `analyze.md -pdf` — rewritten to use `services/pdf` only; removed deprecated `../callback-cv/cv_to_pdf.py` references.
 
 ---
 
@@ -111,6 +133,27 @@ python scripts/health_check.py --telegram # + bot check + alert
 
 ---
 
+## P1 — Tracker: editable salary field
+
+Replace static salary badge with inline-editable text input per vacancy row.
+
+**Why:** salary often absent in JD or needs manual correction after the fact.
+
+**How it works:**
+- Tracker row: click `—` or existing value → `<input>` appears inline → blur/Enter → PATCH
+- `PATCH /api/vacancies/{id}/salary` — writes `salary TEXT` (already in DB schema)
+- Auto-fill: Phase 2 already extracts salary into `analysis_json.p2.salary` → write to `vacancies.salary` at analysis time (currently not wired)
+- Display: `$4500` / `3000–4500 USD` / `—` if empty
+
+**Tasks:**
+- [ ] `web/api.py` — `SalaryUpdate` + `PATCH /api/vacancies/{id}/salary`
+- [ ] `db/database.py` — `set_vacancy_salary(id, value)` helper
+- [ ] `tracker.html` — replace `.salary-badge` static span with inline editable field; click-to-edit UX, blur saves
+- [ ] `tools/cv_analyze.py` — wire `p2.salary` → `vacancies.salary` on phase 2 completion
+- [ ] Tests: 3 API tests (set/clear/404) + 1 reader test
+
+---
+
 ## P1 — Pipeline Cost Preview
 
 Feature: cost estimate sent to user before full pipeline run.
@@ -183,6 +226,46 @@ Phase 4 (cover):     ~$0.05
 
 - [ ] Telegram webhook mode (config flag, currently long polling)
 - [ ] asyncio.Queue → Redis (when concurrent users justify it)
+
+---
+
+## P3 — MCP Server (AI Interoperability)
+
+**Why this matters — the real motivation:**
+
+Job search is the kind of task a personal AI assistant should own end-to-end on your behalf.
+Not a tool you query manually — a capability your AI agent invokes for you.
+
+Imagine: your personal Claude Project, custom GPT, or any MCP-compatible agent
+can call Career Agent as a native tool — analyze a vacancy you forward it,
+check your fit before you've even opened the link, trigger CV generation, track
+where you've applied. The agent becomes your personal career strategist, not just
+a chatbot. You close the job search loop without switching contexts.
+
+That's the unlock: Career Agent as infrastructure for personal AI agents, not just
+a standalone app. Any intelligent assistant with MCP support can become a
+full-service job search partner for its owner — using this service as the backbone.
+
+**What to expose as MCP tools:**
+
+| Tool | Description |
+|------|-------------|
+| `analyze_vacancy` | URL or JD text → fit score, recommendation, barriers |
+| `generate_cv` | vacancy_id + user_id → CV.md + PDF |
+| `generate_cover` | vacancy_id + user_id → cover letter |
+| `get_tracker` | user_id → list of vacancies with status, fit, applied |
+| `set_applied` | vacancy_id → mark CV as submitted |
+| `get_vacancy` | vacancy_id → full analysis + CV + cover |
+
+**Stack:** FastMCP or manual MCP JSON-RPC server wrapping existing `web/api.py` + tools.
+Auth: API key per user (tied to `users` table).
+
+**Tasks:**
+- [ ] Design MCP tool schema (names, params, return types)
+- [ ] `services/mcp/` — FastMCP server wrapping existing logic
+- [ ] Auth: `api_key` column on `users` table + MCP auth middleware
+- [ ] `docs/mcp-integration.md` — how to wire Career Agent into Claude Projects / custom agents
+- [ ] Test with Claude Projects + Claude Code agent as clients
 
 ---
 

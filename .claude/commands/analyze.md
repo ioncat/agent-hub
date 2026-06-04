@@ -5,25 +5,53 @@ Handles mode selection, user selection, and pipeline start in one command.
 
 ---
 
-## Step 0 — Profile + Mode confirm (always first)
+## Step 0 — Combined menu (always first)
 
-**Every `/analyze` run begins here** — before inbox, before everything.
+**Every `/analyze` run begins here** — ONE message, two blocks, no round-trip.
+Mirrors the `-v` combined display: Block 1 = profile/mode (`1–10`), Block 2 = actions (`11–20`).
 
-Read `skill/active_user` → ID → `skill/users.yaml` → name + slug. Display:
+**Before displaying — scan inbox** (populates Block 2):
 
-```
-👤 Alex Bondarenko (alex)
-  [1] Локально — Claude Code (без Anthropic API)
-  [2] API — Anthropic Claude (с расходом токенов)
-  [3] Другой профиль → /analyze -u [id|slug]
+```bash
+python scripts/inbox_scan.py --user-id [user_id] --json
 ```
 
-- **[1]** → `MODE = local`, proceed to inbox check with this profile
-- **[2]** → `MODE = api`, proceed to inbox check with this profile
-- **[3]** → show user list (same as `-l`), stop — user re-runs with `-u`
-- Selected mode applies to **all phases and all inbox files** in this invocation
-- Display selected mode in all subsequent status lines: `[Локально]` or `[API]`
-- **Skip Step 0 for:** `-l` (list users), `-inbox` (list inbox only) — read-only, no pipeline
+Read `skill/active_user` → ID → `skill/users.yaml` → name + slug. Then display **both blocks side by side — vertical split (columns), NOT a horizontal ━━━ divider**:
+
+```
+👤 Alex Bondarenko (alex) · [режим ещё не выбран]
+
+  Профиль / Режим              │   📥 Inbox — N вакансий
+  ─────────────────────────    │   ──────────────────────────────
+  [1] Локально (Claude Code)   │   [11] Role — Company 🆕
+  [2] API (расход токенов)     │   [12] Role — Company ♻️
+  [3] Другой профиль (-u)      │   [13] обработать все (batch)
+                               │   [14] пропустить inbox → новая
+```
+
+Left column = Block 1 (`1–10`). Right column = Block 2 (`11–20`). `│` separates them.
+
+**If inbox empty — right column collapses to:**
+```
+  Профиль / Режим              │   📥 Inbox пуст
+  ─────────────────────────    │   ──────────────────────────────
+  [1] Локально (Claude Code)   │   [11] Загрузить новую вакансию
+  [2] API (расход токенов)     │        — вставь JD или URL
+  [3] Другой профиль (-u)      │
+```
+
+### Routing (numbering is unambiguous)
+
+- **Answer 1/2** → set `MODE = local|api`. If an action wasn't also given → re-display Block 2 only ("Что обрабатываем?").
+- **Answer 3** → show user list (same as `-l`), stop — user re-runs with `-u`.
+- **Answer 11–1X (a vacancy)** → process that inbox item. `13` = batch, `14` = skip inbox → new vacancy.
+- **Combined answer** (e.g. `2 11`, `1, 13`) → set mode AND act in one step. Preferred — kills the round-trip.
+- **Action given without mode** → default `MODE = local` (most common). Show `[Локально]` in status lines.
+
+- Selected mode applies to **all phases and all inbox files** in this invocation.
+- Display selected mode in all subsequent status lines: `[Локально]` or `[API]`.
+- **Skip Step 0 for:** `-l` (list users), `-inbox` (list inbox only) — read-only, no pipeline.
+- **`-v [id]`** has its own combined display (vacancy phase actions in Block 2) — see `-v` section.
 
 ---
 
@@ -253,10 +281,11 @@ Match argument (partial, case-insensitive) against folder names in `vacancies/`.
 
 **One match — regenerate:**
 
-For each eligible `.md` in the folder, run:
+For each eligible `.md` in the folder, render via the **pdf-service** (`services/pdf/`) — NEVER `../callback-cv/cv_to_pdf.py` (deprecated, external repo):
 ```bash
-CAREER_AGENT_FONTS=fonts/ python ../callback-cv/cv_to_pdf.py vacancies/[user_id]/[Company — Role]/[file].md
+CAREER_AGENT_FONTS=fonts/ python -c "import sys,pathlib; sys.path.insert(0,'services/pdf'); from render import render_to_bytes; p=pathlib.Path('vacancies/[user_id]/[Company — Role]/[file].md'); p.with_suffix('.pdf').write_bytes(render_to_bytes(p.read_text(encoding='utf-8')))"
 ```
+(Or POST the markdown to `http://localhost:8002/render` if the service is running.)
 
 Report result:
 ```
@@ -278,11 +307,17 @@ Checked automatically on every `/analyze` run (before loading profile).
 
 ### `-inbox` — Show inbox contents only
 
-```
-📥 Inbox — vacancies/inbox_manual/ (N файлів):
+Run the canonical scanner (human output), then stop:
 
-  1. stripe-pm.md
-  2. djinni-job.txt
+```bash
+python scripts/inbox_scan.py --user-id [user_id]
+```
+
+```
+📥 Inbox — vacancies/inbox_manual/ (N шт.):
+
+  1. Role — Company   🆕 новая
+  2. Role — Company   ♻️ уже обработана
 
 /analyze      — обробити з активним профілем
 /analyze -u   — обробити з іншим профілем
@@ -292,36 +327,39 @@ Stop after display.
 
 ### Auto-check on `/analyze` (no args, `-n`, `-u`)
 
-Runs **after Step 0** (profile + mode already confirmed).
+**Inbox scan is part of Step 0** — it populates Block 2 of the combined menu.
+There is **no separate mode-then-inbox round-trip**. This section is the detail of Block 2.
 
-1. Scan `vacancies/inbox_manual/` — `.md` and `.txt` files only (skip `processed/`, `.gitkeep`)
-2. **No files** → skip, proceed to normal load & start
-3. **Files found** → dedup check per file (see `skill/SKILL.md` → Sequential/Batch Mode for detail):
-   - Extract `Source: http...` from first 3 lines → grep against `vacancies/inbox/{user_id}/*/JD.md`
+> ⚠️ **inbox = папки, не плоские файлы.** Drops лежат как `inbox_manual/Role — Company/<jd>.md`.
+> НЕ сканируй через `ls`/`find` руками — нерекурсивный `ls` пропустит подпапки.
+> Каноническая команда scan (рекурсивная + dedup, единая точка истины):
+
+```bash
+python scripts/inbox_scan.py --user-id [user_id] --json
+```
+
+1. Run `scripts/inbox_scan.py --user-id [user_id] --json` — returns array of drops
+   (each: `title`, `source_url`, `file`, `raw_folder`, `seen`, `seen_path`).
+   Dedup already done per item (`seen`/`seen_path` = match in `vacancies/inbox/{user_id}/*/JD.md`).
+2. **Empty array** → Block 2 = `[11] Загрузить новую вакансию`. Proceed to load & start.
+3. **Items found** → render as Block 2 (`11` = first vacancy, `12` = second, … `[N+11]` = batch, last = skip→new).
+   Per-item `seen` handling:
    - Already seen → Sequential: ask skip/reprocess · Batch: skip silently, mark `♻️ уже обработана`
-4. Show inbox menu:
+   - `raw_folder` → exact arg for `vacancy_track.py delete-inbox --folder` after processing
+4. Block 2 menu (rendered inside the Step 0 combined message):
 
 ```
-📥 Найдено N вакансий в inbox [Локально]:
-
-  1. Role — Company
-  2. Role — Company
-  ...
-
-Что делаем?
-  [1]  — обработать конкретную вакансию (через любой разделитель укажи номер: "1", "1,3", "1 3")
-  [2]  — обработать все (batch)
-  [3]  — пропустить inbox, начать с новой вакансией
+📥 Inbox — N вакансий:
+  [11] Role — Company 🆕
+  [12] Role — Company ♻️
+  [13] обработать все (batch)
+  [14] пропустить inbox → новая вакансия
 ```
 
-4. If multiple users → ask profile (skip if active user already selected via `-u`):
-   *(mode already selected in Step 0 — do not ask again)*
+   Multi-select inbox items via any separator: `11`, `11,12`, `11 12`.
 
-```
-Для какого профиля?
-  [1] Alex Bondarenko (alex) ← активный
-  [2] Maria Beleshko (maria)
-```
+5. Profile is fixed by `active_user` / `-u` — never re-ask it here.
+   *(mode handled by Block 1 — do not ask separately)*
 
 6. **Choose processing mode** based on selected count:
    - **1–2 vacancies** → Sequential mode (process one by one, full analysis shown per vacancy)
