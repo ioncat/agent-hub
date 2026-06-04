@@ -6,15 +6,11 @@
 
 ---
 
-## 🔴 P0 — Deterministic PDF templating (TOMORROW, 2026-06-05)
+## 🔴 P0 — [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md) — Deterministic vs Cognitive pipeline split
 
-**Goal:** Replace ad-hoc generative PDF rendering with **deterministic Python/HTML templating**. Content slots into a fixed template that predictably and uniformly produces correct PDF layout — always, without errors.
+**Goal:** Draw the boundary — deterministic work in Python (FSM orchestrator), LLM only for irreducible cognitive phases (single structured calls). Source: `docs/discovery/hypotheses/H-002`.
 
-**Why:** Current `services/pdf/render.py` `render_md()` is line-by-line ad-hoc parsing → fragile. This session alone surfaced two layout bugs: cover text forced into CV name/headline/contacts blocks (overflow, no wrap) and contacts-line inconsistency. Each fix is a patch on a brittle parser.
-
-**Approach (to decide):** HTML/Jinja2 template + headless renderer (WeasyPrint?) OR structured fpdf2 template with explicit CV-template + cover-template. Content = typed sections (name, headline, contacts, summary, experience[], certifications / cover body) slotted in. No guessing from raw markdown line shapes.
-
-**Acceptance:** CV (EN/UA) + cover render identically every run; no overflow, no misparse; one template per doc type.
+**Task 1 (TOMORROW 2026-06-05):** deterministic PDF templating (CV + cover templates) — replaces fragile `render_md`. Cleanest "remove from AI contour" win; independent of the rest. See EPIC-21 for full task list (blocker-ordered) + classification + target architecture.
 
 ---
 
@@ -57,6 +53,7 @@
 | EPIC-18 | Rename agent-hub → career-agent | ✅ Done (2026-06-01) |
 | [EPIC-19](docs/delivery/epics/EPIC-19-local-execution.md) | Local execution mode (web UI) | 📋 Planned |
 | [EPIC-20](docs/delivery/Epics/EPIC-20-vacancy-path-standard.md) | Unified vacancy path standard | 📋 Planned |
+| [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md) | Deterministic vs Cognitive pipeline split | 📋 Planned (P0 — Task 1 tomorrow) |
 
 ---
 
