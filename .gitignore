@@ -55,6 +55,10 @@ docs/discovery/
 # Personal skill + profile (private data — not for public repo)
 skill/
 
+# Skill-type-specific prompts (contain user-specific contact info and personal framing)
+# prompts/generic/ is public; prompts/pm/ and any other skill-type dirs are private
+prompts/pm/
+
 # Fonts — licensed, not for public repo (copy from C:/Windows/Fonts/ or callback-cv/fonts/)
 fonts/
 

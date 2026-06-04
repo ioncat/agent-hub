@@ -17,17 +17,33 @@ from pathlib import Path
 from fpdf import FPDF, FontFace
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-# CAREER_AGENT_FONTS env var lets the host inject fonts without rebuilding the image
+_PROJECT_ROOT = Path(_SCRIPT_DIR).parent.parent  # services/pdf/ → project root
+
+# Load project .env so CAREER_AGENT_FONTS is available when running via uvicorn
+try:
+    from dotenv import load_dotenv
+    load_dotenv(_PROJECT_ROOT / ".env", override=False)
+except ImportError:
+    pass
+
+# CAREER_AGENT_FONTS env var lets the host inject fonts without rebuilding the image.
+# Default: project root fonts/ directory (absolute path — CWD-independent).
 _env_fonts = os.environ.get("CAREER_AGENT_FONTS")
-FONT_PATH = (_env_fonts.rstrip("/\\") + "/") if _env_fonts else (os.path.join(_SCRIPT_DIR, "fonts") + "/")
+if _env_fonts:
+    FONT_PATH = _env_fonts.rstrip("/\\") + "/"
+else:
+    FONT_PATH = str(_PROJECT_ROOT / "fonts") + os.sep
 
 
 def _find_font(name: str, fallback: str) -> str:
-    """Use CAREER_AGENT_FONTS path if file exists there, else fall back to local fonts/."""
-    primary = FONT_PATH + name
+    """Resolve font path: FONT_PATH/name → FONT_PATH/fallback → error."""
+    primary = os.path.join(FONT_PATH, name)
     if os.path.exists(primary):
         return primary
-    return os.path.join(_SCRIPT_DIR, "fonts", fallback)
+    alt = os.path.join(FONT_PATH, fallback)
+    if os.path.exists(alt):
+        return alt
+    raise FileNotFoundError(f"TTF Font file not found: {primary}")
 
 
 FONTS = {
@@ -57,6 +73,9 @@ SECTION_KEYWORDS = {
     # Russian
     "ОПЫТ", "СЕРТИФИКАТЫ", "ОБРАЗОВАНИЕ",
 }
+
+# Section/role header color — medium blue
+_HEADER_COLOR: tuple[int, int, int] = (66, 133, 244)
 
 KEY_RESULTS_RE = re.compile(
     r"^(key results?|key outcome|ключові результати|ключовий результат):?\s*$",
@@ -130,18 +149,18 @@ class CVDocument(FPDF):
             m = re.match(r"\[([^\]]+)\]\(([^)]+)\)", part)
             if m:
                 self.set_text_color(17, 85, 204)
-                self.cell(self.get_string_width(m.group(1)), 5.5, m.group(1), link=m.group(2))
+                self.write(5.5, m.group(1), link=m.group(2))
                 self.set_text_color(80, 80, 80)
             elif part:
-                plain = strip_md_inline(part)
-                self.cell(self.get_string_width(plain), 5.5, plain)
+                self.write(5.5, strip_md_inline(part))
         self.ln(4)
 
     def section_header(self, text: str) -> None:
         self.ln(2)
         self.set_font(FONT_NAME, "B", 12)
-        self.set_text_color(0, 0, 0)
+        self.set_text_color(*_HEADER_COLOR)
         self.cell(0, 6.5, text.upper(), new_x="LMARGIN", new_y="NEXT")
+        self.set_text_color(0, 0, 0)
         self.ln(2)
 
     def role_title(self, text: str) -> None:
@@ -425,6 +444,11 @@ def render_md(pdf: CVDocument, text: str) -> None:
         lm = re.match(r"^\[([^\]]+)\]\(([^)]+)\)\s*$", s)
         if lm:
             pdf.link_line(lm.group(1), lm.group(2))
+            i += 1
+            continue
+
+        if is_section_header(s):
+            pdf.section_header(s)
             i += 1
             continue
 

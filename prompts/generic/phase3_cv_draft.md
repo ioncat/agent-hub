@@ -29,6 +29,9 @@ User will provide:
 8. **Metrics belong in Key Results only** — do not duplicate in prose
 9. **NO Location**
 10. **Certifications** — include only if directly relevant to this vacancy; omit otherwise
+11. **NEVER use plural forms for things built or owned: no "systems", "portals", "platforms".** Name individual items specifically (singular each), or use "product" / "product suite" as a collective. Exception: "products" is allowed only when referring to multiple distinct products in context.
+12. **NEVER use third-person verbs anywhere in the CV** — no "Understands", "Knows", "Applies", "Works", "Brings", "Has". CV language = headline-style (no subject) or past-tense action verbs. Applies to Summary, bullets, and all prose.
+13. **GitHub link — include only if vacancy has explicit engineering/code signal.** If candidate has a portfolio site, it covers GitHub; GitHub URL in header is redundant.
 
 ---
 
