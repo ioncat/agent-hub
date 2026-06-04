@@ -128,7 +128,7 @@ class TestRecClass:
             id=1, title="T", url="u", site="s", status="fetched", date="2026-05-30",
             fit_score="—", recommendation=rec, category="", warnings="", blockers="",
             has_analysis=False, has_cv=False, has_cover=False, has_pdf=False,
-            analysis_md="",
+            analysis_md="", salary="",
         )
 
     def test_podavat(self):
@@ -155,6 +155,18 @@ class TestRecClass:
     def test_unknown_rec(self):
         assert self._view("подумать").rec_class == ""
 
+    def test_decline_english(self):
+        assert self._view("decline").rec_class == "rec-no"
+
+    def test_take_a_chance_english(self):
+        assert self._view("take a chance").rec_class == "rec-consider"
+
+    def test_take_a_chance_uppercase(self):
+        assert self._view("Take a Chance").rec_class == "rec-consider"
+
+    def test_rassmotrety(self):
+        assert self._view("рассмотреть").rec_class == "rec-consider"
+
 
 # ── VacancyView.warn_count ────────────────────────────────────────────────────
 
@@ -164,7 +176,7 @@ class TestWarnCount:
             id=1, title="T", url="u", site="s", status="fetched", date="2026-05-30",
             fit_score="—", recommendation="", category="", warnings=warnings, blockers="",
             has_analysis=False, has_cv=False, has_cover=False, has_pdf=False,
-            analysis_md="",
+            analysis_md="", salary="",
         )
 
     def test_empty(self):
@@ -201,7 +213,7 @@ class TestWarnTextEscaped:
             id=1, title="T", url="u", site="s", status="fetched", date="2026-05-30",
             fit_score="—", recommendation="", category="", warnings=warnings, blockers="",
             has_analysis=False, has_cv=False, has_cover=False, has_pdf=False,
-            analysis_md="",
+            analysis_md="", salary="",
         )
 
     def test_plain_text_unchanged(self):
@@ -294,8 +306,8 @@ class TestBuildVacancyView:
         jd = tmp_path / "JD.md"
         jd.write_text("# Job", encoding="utf-8")
         (tmp_path / "JD_analysis.md").write_text(_SAMPLE_ANALYSIS, encoding="utf-8")
-        # Name with spaces → Oleksii_Bondarenko
-        (tmp_path / "Oleksii_Bondarenko_CV.md").write_text("cv", encoding="utf-8")
+        # Name with spaces → "Oleksii Bondarenko_CV.md" (spaces preserved)
+        (tmp_path / "Oleksii Bondarenko_CV.md").write_text("cv", encoding="utf-8")
         row = _row(markdown_path=str(jd))
         v = build_vacancy_view(row, candidate_name="Oleksii Bondarenko")
         assert v.has_cv is True
@@ -324,3 +336,85 @@ class TestBuildVacancyView:
         row = _row(markdown_path=str(jd))
         v = build_vacancy_view(row)
         assert v.rec_class == "rec-yes"
+
+
+# ── VacancyView.site_display ──────────────────────────────────────────────────
+
+class TestSiteDisplay:
+    def _view(self, site: str) -> VacancyView:
+        return VacancyView(
+            id=1, title="T", url="u", site=site, status="fetched", date="2026-05-30",
+            fit_score="—", recommendation="", category="", warnings="", blockers="",
+            has_analysis=False, has_cv=False, has_cover=False, has_pdf=False,
+            analysis_md="", salary="",
+        )
+
+    def test_djinni(self):
+        assert self._view("djinni").site_display == "Djinni"
+
+    def test_dou(self):
+        assert self._view("dou").site_display == "DOU"
+
+    def test_linkedin(self):
+        assert self._view("linkedin").site_display == "LinkedIn"
+
+    def test_unknown_capitalised(self):
+        assert self._view("hh").site_display == "Hh"
+
+    def test_other_keyword(self):
+        assert self._view("other").site_display == "Other"
+
+    def test_empty_returns_other(self):
+        assert self._view("").site_display == "Other"
+
+
+# ── VacancyView.applied ───────────────────────────────────────────────────────
+
+class TestApplied:
+    def _view(self, applied: bool = False) -> VacancyView:
+        return VacancyView(
+            id=1, title="T", url="u", site="s", status="fetched", date="2026-05-30",
+            fit_score="—", recommendation="", category="", warnings="", blockers="",
+            has_analysis=False, has_cv=False, has_cover=False, has_pdf=False,
+            applied=applied,
+        )
+
+    def test_applied_defaults_false(self):
+        v = VacancyView(
+            id=1, title="T", url="u", site="s", status="fetched", date="2026-05-30",
+            fit_score="—", recommendation="", category="", warnings="", blockers="",
+            has_analysis=False, has_cv=False, has_cover=False, has_pdf=False,
+        )
+        assert v.applied is False
+
+    def test_applied_true(self):
+        assert self._view(applied=True).applied is True
+
+    def test_applied_false(self):
+        assert self._view(applied=False).applied is False
+
+
+# ── VacancyView.starred ───────────────────────────────────────────────────────
+
+class TestStarred:
+    def _view(self, starred: bool = False) -> VacancyView:
+        return VacancyView(
+            id=1, title="T", url="u", site="s", status="fetched", date="2026-05-30",
+            fit_score="—", recommendation="", category="", warnings="", blockers="",
+            has_analysis=False, has_cv=False, has_cover=False, has_pdf=False,
+            starred=starred,
+        )
+
+    def test_starred_defaults_false(self):
+        v = VacancyView(
+            id=1, title="T", url="u", site="s", status="fetched", date="2026-05-30",
+            fit_score="—", recommendation="", category="", warnings="", blockers="",
+            has_analysis=False, has_cv=False, has_cover=False, has_pdf=False,
+        )
+        assert v.starred is False
+
+    def test_starred_true(self):
+        assert self._view(starred=True).starred is True
+
+    def test_starred_false(self):
+        assert self._view(starred=False).starred is False

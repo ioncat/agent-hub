@@ -68,6 +68,12 @@ tr:hover:not(.date-sep) td{background:#fafafa}
 .site-other,.site-{background:#f3f4f6;color:#6b7280}
 .salary-badge{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:10px;font-size:11px;background:#d1fae5;color:#065f46;font-weight:600}
 .barriers-cell{max-width:220px;vertical-align:top;font-size:11px;color:#374151;line-height:1.5}
+.applied-chk{width:15px;height:15px;cursor:pointer;accent-color:#16a34a}
+.saved-flash{display:inline-block;margin-left:5px;font-size:10px;font-weight:600;color:#16a34a;opacity:1;transition:opacity .4s ease}
+.saved-flash.fade{opacity:0}
+.star-btn{cursor:pointer;font-size:15px;background:none;border:none;padding:0;color:#d1d5db;line-height:1}
+.star-btn:hover{color:#f59e0b}
+tr[data-starred="1"] .star-btn{color:#f59e0b}
 </style>
 </head>
 <body>
@@ -100,6 +106,15 @@ tr:hover:not(.date-sep) td{background:#fafafa}
     <option value="rec-consider">⚠️ Take a chance</option>
     <option value="rec-no">❌ Decline</option>
   </select>
+  <select id="f-starred" onchange="filter()">
+    <option value="">Все вакансии</option>
+    <option value="1">⭐ Избранное</option>
+  </select>
+  <select id="f-applied" onchange="filter()">
+    <option value="">Все статусы</option>
+    <option value="1">✉️ Отправлено</option>
+    <option value="0">Не отправлено</option>
+  </select>
   <input id="f-text" type="search" placeholder="Поиск…" oninput="filter()" style="width:180px">
   <span class="count" id="count"></span>
   <div class="sep-ctrl">
@@ -111,6 +126,7 @@ tr:hover:not(.date-sep) td{background:#fafafa}
   <thead>
     <tr>
       <th style="width:28px">#</th>
+      <th style="width:28px" title="Избранное">⭐</th>
       <th onclick="sort(1)">Вакансия</th>
       <th onclick="sort(2)">Фит</th>
       <th>Рекоменд.</th>
@@ -119,6 +135,7 @@ tr:hover:not(.date-sep) td{background:#fafafa}
       <th>Анализ</th>
       <th>CV</th>
       <th>Кавер</th>
+      <th title="CV отправлено">✉</th>
     </tr>
   </thead>
   <tbody id="tbody">
@@ -126,12 +143,13 @@ tr:hover:not(.date-sep) td{background:#fafafa}
   {% for v in vacancies %}
     {% if v.date != ns.last_date %}
     <tr class="date-sep" data-group-date="{{ v.date }}">
-      <td colspan="9"><span class="grp-icon" data-type="date" data-date="{{ v.date }}">▼</span>{{ v.date }}</td>
+      <td colspan="11"><span class="grp-icon" data-type="date" data-date="{{ v.date }}">▼</span>{{ v.date }}</td>
     </tr>
     {% set ns.last_date = v.date %}
     {% endif %}
-    <tr class="{{ v.rec_class }}" data-idx="{{ v.id }}" data-site="{{ v.site or '' }}" data-date="{{ v.date }}">
+    <tr class="{{ v.rec_class }}" data-idx="{{ v.id }}" data-site="{{ v.site or '' }}" data-date="{{ v.date }}" data-applied="{{ '1' if v.applied else '0' }}" data-starred="{{ '1' if v.starred else '0' }}">
       <td class="num">{{ v.id }}<span class="expand-btn" data-expand="{{ v.id }}" title="Показать анализ">▶</span></td>
+      <td style="text-align:center"><button class="star-btn" data-id="{{ v.id }}" onclick="toggleStarred(this)" title="Избранное">{{ '★' if v.starred else '☆' }}</button></td>
       <td class="vname"><span class="site-chip site-{{ v.site or 'other' }}">{{ v.site_display }}</span><a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a></td>
       <td class="fit">{{ v.fit_score }}</td>
       <td>{% if v.rec_class == 'rec-yes' %}✅{% elif v.rec_class == 'rec-no' %}❌{% elif v.rec_class == 'rec-consider' %}⚠️{% endif %} {{ v.recommendation }}{% if v.warn_count > 0 %}<span class="warn-chip" data-warn="{{ v.warn_text_escaped }}">⚠ {{ v.warn_count }}</span>{% endif %}</td>
@@ -140,9 +158,10 @@ tr:hover:not(.date-sep) td{background:#fafafa}
       <td>{% if v.has_analysis %}<span class="tick">✓</span>{% else %}<span class="cross">—</span>{% endif %}</td>
       <td>{% if v.has_pdf %}<a href="{{ v.cv_pdf_url }}" target="_blank" class="tick" style="text-decoration:none" title="Открыть CV PDF">✓</a>{% else %}<span class="cross">—</span>{% endif %}</td>
       <td>{% if v.has_cover %}<span class="tick">✓</span>{% else %}<span class="cross">—</span>{% endif %}</td>
+      <td style="text-align:center"><input type="checkbox" class="applied-chk" data-id="{{ v.id }}" {% if v.applied %}checked{% endif %} onchange="toggleApplied(this)" title="Отмечено как отправлено"></td>
     </tr>
     <tr class="expand-row" data-for="{{ v.id }}" style="display:none">
-      <td colspan="9">
+      <td colspan="11">
         <div class="analysis-body">
           {% if v.has_analysis %}{{ v.analysis_md | markdown | safe }}{% else %}<em>Анализ отсутствует.</em>{% endif %}
         </div>
@@ -160,12 +179,16 @@ let   sortActive = false;
 
 // ── Core visibility ──────────────────────────────────────────────────────────
 function rowMatchesFilter(row) {
-  const rec  = document.getElementById('f-rec').value;
-  const site = document.getElementById('f-site').value;
-  const txt  = document.getElementById('f-text').value.toLowerCase();
-  return (!rec  || row.classList.contains(rec))
-      && (!site || row.dataset.site === site)
-      && (!txt  || row.textContent.toLowerCase().includes(txt));
+  const rec     = document.getElementById('f-rec').value;
+  const site    = document.getElementById('f-site').value;
+  const applied = document.getElementById('f-applied').value;
+  const starred = document.getElementById('f-starred').value;
+  const txt     = document.getElementById('f-text').value.toLowerCase();
+  return (!rec     || row.classList.contains(rec))
+      && (!site    || row.dataset.site === site)
+      && (!applied || row.dataset.applied === applied)
+      && (!starred || row.dataset.starred === starred)
+      && (!txt     || row.textContent.toLowerCase().includes(txt));
 }
 
 function applyViz() {
@@ -272,8 +295,67 @@ function filterUser(uid) {
 }
 
 function filter() {
-  localStorage.setItem('f-rec',  document.getElementById('f-rec').value);
-  localStorage.setItem('f-site', document.getElementById('f-site').value);
+  localStorage.setItem('f-rec',     document.getElementById('f-rec').value);
+  localStorage.setItem('f-site',    document.getElementById('f-site').value);
+  localStorage.setItem('f-applied', document.getElementById('f-applied').value);
+  localStorage.setItem('f-starred', document.getElementById('f-starred').value);
+  applyViz();
+}
+
+async function toggleApplied(cb) {
+  const id = cb.dataset.id;
+  const applied = cb.checked;
+  // Optimistically update row data-applied for filter to work immediately
+  const row = document.querySelector(`tr[data-idx="${id}"]`);
+  if (row) row.dataset.applied = applied ? '1' : '0';
+  try {
+    const resp = await fetch(`/api/vacancies/${id}/applied`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({applied})
+    });
+    if (!resp.ok) {
+      cb.checked = !applied; // revert on server error
+      if (row) row.dataset.applied = applied ? '0' : '1';
+    } else {
+      // Show "✓ saved" flash next to checkbox, fade out after 1.6s, remove after 2s
+      const cell = cb.parentElement;
+      const existing = cell.querySelector('.saved-flash');
+      if (existing) existing.remove();
+      const flash = document.createElement('span');
+      flash.className = 'saved-flash';
+      flash.textContent = '✓ saved';
+      cell.appendChild(flash);
+      setTimeout(() => flash.classList.add('fade'), 1600);
+      setTimeout(() => flash.remove(), 2000);
+    }
+  } catch(e) {
+    cb.checked = !applied;
+    if (row) row.dataset.applied = applied ? '0' : '1';
+  }
+  applyViz(); // re-filter in case f-applied filter is active
+}
+
+async function toggleStarred(btn) {
+  const id = btn.dataset.id;
+  const starred = btn.textContent.trim() === '☆'; // ☆ → starring, ★ → unstarring
+  const row = document.querySelector(`tr[data-idx="${id}"]`);
+  btn.textContent = starred ? '★' : '☆';
+  if (row) row.dataset.starred = starred ? '1' : '0';
+  try {
+    const resp = await fetch(`/api/vacancies/${id}/starred`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({starred})
+    });
+    if (!resp.ok) {
+      btn.textContent = starred ? '☆' : '★';
+      if (row) row.dataset.starred = starred ? '0' : '1';
+    }
+  } catch(e) {
+    btn.textContent = starred ? '☆' : '★';
+    if (row) row.dataset.starred = starred ? '0' : '1';
+  }
   applyViz();
 }
 
@@ -291,8 +373,10 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') document.get
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 (function() {
-  const s = localStorage.getItem('f-rec');  if (s) document.getElementById('f-rec').value  = s;
-  const t = localStorage.getItem('f-site'); if (t) document.getElementById('f-site').value = t;
+  const s = localStorage.getItem('f-rec');     if (s) document.getElementById('f-rec').value     = s;
+  const t = localStorage.getItem('f-site');    if (t) document.getElementById('f-site').value    = t;
+  const u = localStorage.getItem('f-applied'); if (u) document.getElementById('f-applied').value = u;
+  const v = localStorage.getItem('f-starred'); if (v) document.getElementById('f-starred').value = v;
   applyViz();
 })();
 </script>

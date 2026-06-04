@@ -7,7 +7,8 @@ Tool registered in agent.py via ToolRegistry.
 Receives shared dependencies via RunContext[AgentDeps].
 
 Folder layout:
-    vacancies/{user_id}/{site}/YYYY-MM/{slug}/JD.md
+    vacancies/inbox/{user_id}/{slug}/JD.md   ← staging area until analyzed
+    vacancies/{user_id}/{Role — Company}/     ← final location after analysis
 
 Usage (by PydanticAI Agent, not called directly):
     # user sends URL → router calls this tool automatically
@@ -71,10 +72,9 @@ async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
 
     # ── Build filesystem path ─────────────────────────────────────────────────
     site = _detect_site(url)
-    month = datetime.now().strftime("%Y-%m")
     slug = _url_slug(url)
 
-    vacancy_dir = ctx.deps.vacancies_path / str(ctx.deps.user_id) / site / month / slug
+    vacancy_dir = ctx.deps.vacancies_path / "inbox" / str(ctx.deps.user_id) / slug
     vacancy_dir.mkdir(parents=True, exist_ok=True)
     jd_path = vacancy_dir / "JD.md"
 

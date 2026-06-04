@@ -1,6 +1,6 @@
 # EPIC-17 — Onboarding: PDF → Interview → Profile
 
-**Status:** 📋 Planned
+**Status:** ✅ Done (2026-06-01) — Phase 1 (stub interview)
 **Phase:** Phase 5 of PIVOT-PLAN
 **Priority:** P0 — Foundation
 **Last updated:** 2026-06-01
@@ -84,12 +84,17 @@ So that Career Agent builds a rich, personalised profile for me automatically �
 
 | # | Task | Status |
 |---|------|--------|
-| 1 | Telegram `/start` flow + `skill_type` question | 📋 |
-| 2 | PDF upload handler + Markdown extraction (`pypdf`) | 📋 |
-| 3 | LLM interview generation prompt (`prompts/[skill_type]/onboarding_interview.md`) | 📋 |
-| 4 | Multi-turn conversation FSM (aiogram FSMContext) | 📋 |
-| 5 | Profile synthesis: transcript → structured profile → DB | 📋 |
-| 6 | `ClaudeProvider` loads profile from DB instead of file | 📋 |
-| 7 | `/update_profile` command — re-interview flow | 📋 |
-| 8 | `/set_skill` command — updates `users.skill_type` | 📋 |
-| 9 | Remove `PROFILE_MD_PATH` from settings | 📋 |
+| 1 | Telegram `/start` flow + `skill_type` question | ✅ |
+| 2 | PDF upload handler + Markdown extraction (`pypdf`) | ✅ |
+| 3 | LLM interview generation prompt (`prompts/[skill_type]/onboarding_interview.md`) | ✅ stub |
+| 4 | Multi-turn conversation FSM (aiogram FSMContext) | ✅ |
+| 5 | Profile synthesis: transcript → structured profile → DB | ✅ stub |
+| 6 | `ClaudeProvider` loads profile from DB instead of file | ✅ |
+| 7 | `/update_profile` command — re-interview flow | ✅ |
+| 8 | `/set_skill` command — updates `users.skill_type` | ✅ |
+| 9 | Remove `PROFILE_MD_PATH` from settings | ⏳ deprecated (remove after prod rollout) |
+
+**Phase 2 (pending design):**
+| 10 | AI Interview System — LLM-generated questions + multi-turn | 🔴 DESIGN REQUIRED |
+
+See `docs/discovery/core-differentiators.md` — AI Interview System.

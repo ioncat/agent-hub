@@ -110,7 +110,7 @@ async def test_new_vacancy_queues_successfully(client):
     # Vacancy is in DB with queued status
     rows = await database.list_vacancies(status="queued", user_id=uid)
     assert len(rows) == 1
-    assert rows[0]["url"] == "https://djinni.co/jobs/100/"
+    assert rows[0]["url"] == "https://djinni.co/jobs/100"  # normalised: trailing slash stripped
 
 
 @pytest.mark.asyncio
@@ -131,3 +131,73 @@ async def test_new_vacancy_minimal_payload(client):
     """POST /api/new-vacancy with only url field (no title/feed_name/user_id) succeeds."""
     resp = client.post("/api/new-vacancy", json={"url": "https://djinni.co/jobs/300/"})
     assert resp.status_code == 201
+
+
+# ── PATCH /api/vacancies/{id}/applied ─────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_set_applied_true(client):
+    """PATCH /api/vacancies/{id}/applied with applied=true sets flag in DB."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/500/")
+
+    resp = client.patch(f"/api/vacancies/{vid}/applied", json={"applied": True})
+    assert resp.status_code == 200
+    assert resp.json()["applied"] is True
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["applied"] == 1
+
+
+@pytest.mark.asyncio
+async def test_set_applied_false(client):
+    """PATCH /api/vacancies/{id}/applied with applied=false clears flag in DB."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/501/")
+    await database.set_vacancy_applied(vid, True)
+
+    resp = client.patch(f"/api/vacancies/{vid}/applied", json={"applied": False})
+    assert resp.status_code == 200
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["applied"] == 0
+
+
+@pytest.mark.asyncio
+async def test_set_applied_not_found(client):
+    """PATCH /api/vacancies/9999/applied returns 404 for missing vacancy."""
+    resp = client.patch("/api/vacancies/9999/applied", json={"applied": True})
+    assert resp.status_code == 404
+
+
+# ── PATCH /api/vacancies/{id}/starred ─────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_set_starred_true(client):
+    """PATCH /api/vacancies/{id}/starred with starred=true sets flag in DB."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/510/")
+
+    resp = client.patch(f"/api/vacancies/{vid}/starred", json={"starred": True})
+    assert resp.status_code == 200
+    assert resp.json()["starred"] is True
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["starred"] == 1
+
+
+@pytest.mark.asyncio
+async def test_set_starred_false(client):
+    """PATCH /api/vacancies/{id}/starred with starred=false clears flag in DB."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/511/")
+    await database.set_vacancy_starred(vid, True)
+
+    resp = client.patch(f"/api/vacancies/{vid}/starred", json={"starred": False})
+    assert resp.status_code == 200
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["starred"] == 0
+
+
+@pytest.mark.asyncio
+async def test_set_starred_not_found(client):
+    """PATCH /api/vacancies/9999/starred returns 404 for missing vacancy."""
+    resp = client.patch("/api/vacancies/9999/starred", json={"starred": True})
+    assert resp.status_code == 404

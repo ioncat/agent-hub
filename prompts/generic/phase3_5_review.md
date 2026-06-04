@@ -66,19 +66,13 @@ Do not use any other separator. The parser relies on `---CV---` to extract the C
 
 ---
 
-## Phase 2 Implementation Check
+## Phase 2 Implementation Check (internal only — do NOT output)
 
-Before the review output, verify three things from `JD_analysis.md`:
+Before generating the review, verify three things from `JD_analysis.md`. Use findings to populate ❌/⚠️/🔧/✅ sections. Do NOT output this check or its labels in the review.
 
-1. **Adaptation Plan** — list each action from Phase 2 `## Adaptation Plan`. Mark each:
-   - ✅ applied in draft
-   - ❌ not applied — add to 🔧 Strengthen / reframe
-
-2. **Fit Breakdown ⚠️ items** — are bridgeable gaps addressed or reframed in the CV?
-   If not → add to 🔧 Strengthen / reframe
-
-3. **Fit Breakdown ❌ items** — are they properly absent (not fabricated or implied)?
-   If any ❌ item appears in the draft → add to ❌ Remove / doesn't fit
+1. **Adaptation Plan** — each action applied? If not → add to 🔧
+2. **Fit Breakdown ⚠️ items** — addressed or reframed in CV? If not → add to 🔧
+3. **Fit Breakdown ❌ items** — absent and not implied? If one appears → add to ❌
 
 ---
 

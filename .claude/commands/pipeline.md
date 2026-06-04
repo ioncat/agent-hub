@@ -147,5 +147,5 @@ python scripts/e2e_test.py \
 
 - **Один вопрос за раз** — никогда два вопроса в одном сообщении
 - Phase 3 draft **не показывать** — показывать только после 3.5 self-review
-- Blockers в Quick Scan ≠ нет → Recommendation = не подавать (предупредить пользователя)
+- Blockers в Quick Scan ≠ нет → Recommendation = decline (предупредить пользователя)
 - Язык CV = язык вакансии (не зависит от настроек пользователя)

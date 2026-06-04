@@ -41,6 +41,8 @@ The leverage is your profile: onboard once, and Career Agent turns deep JD analy
 
 ## How it works
 
+> Full system flow with decision logic: [`docs/system-flow.md`](docs/system-flow.md)
+
 A **job counselor**, not a CV generator. Two distinct layers of value:
 
 **Layer 1 — Decision support**

@@ -56,7 +56,7 @@ So that the system has no subprocess dependency on an external repo (callback-cv
 ## Notes for Engineering
 
 - Extract from `callback-cv/cv_to_pdf.py`: `md_to_pdf()`, `CVDocument`, `render_md()` — ~260 lines
-- Fonts (`Segoe UI` ttf) move to `services/pdf/fonts/`
+- Fonts (`Segoe UI` + `Calibri` ttf) stay in project root `fonts/` — `render.py` resolves via `_PROJECT_ROOT/fonts` (absolute, CWD-independent). `CAREER_AGENT_FONTS` env var overrides for Docker.
 - FastAPI endpoint: `POST /render` — body `{"markdown": str}` → response `application/pdf`
 - `CVAdapter` switches `subprocess.run(...)` → `httpx.post(settings.pdf_service_url, ...)`
 - `core/settings.py`: add `PDF_SERVICE_URL`, remove `CALLBACK_CV_PATH`
@@ -77,7 +77,7 @@ So that the system has no subprocess dependency on an external repo (callback-cv
 |---|------|--------|
 | 1 | `services/pdf/render.py` — extracted rendering core | ✅ Done |
 | 2 | `services/pdf/app.py` — FastAPI `POST /render` | ✅ Done |
-| 3 | `services/pdf/fonts/` — Segoe UI fonts | ✅ Done |
+| 3 | Fonts — Segoe UI + Calibri in root `fonts/`, render.py uses `_PROJECT_ROOT/fonts` default | ✅ Done (revised 2026-06-02) |
 | 4 | `services/pdf/requirements.txt` + `Dockerfile` | ✅ Done |
 | 5 | `adapters/cv_adapter.py` — subprocess → httpx | ✅ Done |
 | 6 | `core/settings.py` — add `PDF_SERVICE_URL`, remove `CALLBACK_CV_PATH` | ✅ Done |

@@ -125,9 +125,9 @@ async def test_fetch_jd_correct_folder_structure(tmp_path):
 
     saved = list(ctx.deps.vacancies_path.rglob("JD.md"))
     path_parts = saved[0].parts
-    # path: vacancies/{user_id}/{site}/{YYYY-MM}/{slug}/JD.md
+    # path: vacancies/inbox/{user_id}/{slug}/JD.md
+    assert "inbox" in path_parts    # system inbox
     assert "1" in path_parts        # user_id segment
-    assert "djinni" in path_parts
     assert "123-backend" in path_parts
 
 
@@ -230,9 +230,10 @@ async def test_fetch_jd_path_scoped_to_user_id(tmp_path):
 
     saved = list(ctx.deps.vacancies_path.rglob("JD.md"))
     assert len(saved) == 1
-    # First directory under vacancies_path must be "7" (user_id)
+    # path: inbox/{user_id}/{slug}/JD.md — first part is "inbox", second is user_id
     relative = saved[0].relative_to(ctx.deps.vacancies_path)
-    assert relative.parts[0] == "7"
+    assert relative.parts[0] == "inbox"
+    assert relative.parts[1] == "7"
 
 
 @pytest.mark.asyncio

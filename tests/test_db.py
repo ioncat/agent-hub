@@ -9,6 +9,7 @@ import pytest
 import pytest_asyncio
 
 from db import database
+from db.database import normalize_url, extract_site
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -53,7 +54,7 @@ async def test_get_vacancy_by_id():
     vid = await database.insert_vacancy(url="https://djinni.co/jobs/456/")
     row = await database.get_vacancy_by_id(vid)
     assert row is not None
-    assert row["url"] == "https://djinni.co/jobs/456/"
+    assert row["url"] == "https://djinni.co/jobs/456"  # normalised: trailing slash stripped
 
 
 @pytest.mark.asyncio
@@ -87,7 +88,7 @@ async def test_list_vacancies_filter_status():
 
     done = await database.list_vacancies(status="done")
     assert len(done) == 1
-    assert done[0]["url"] == "https://djinni.co/jobs/10/"
+    assert done[0]["url"] == "https://djinni.co/jobs/10"  # normalised
 
 
 # ── pipeline_runs ─────────────────────────────────────────────────────────────
@@ -247,7 +248,7 @@ async def test_list_vacancies_filter_status_and_user_id():
 
     done = await database.list_vacancies(status="done", user_id=uid)
     assert len(done) == 1
-    assert done[0]["url"] == "https://djinni.co/jobs/400/"
+    assert done[0]["url"] == "https://djinni.co/jobs/400"  # normalised
 
 
 @pytest.mark.asyncio
@@ -268,3 +269,124 @@ async def test_insert_llm_usage_with_user_id():
     )
     assert isinstance(row_id, int)
     assert row_id > 0
+
+
+# ── normalize_url ─────────────────────────────────────────────────────────────
+
+class TestNormalizeUrl:
+    def test_strips_utm_params(self):
+        url = "https://jobs.dou.ua/vacancies/360005/?utm_source=jobsrss"
+        assert normalize_url(url) == "https://jobs.dou.ua/vacancies/360005"
+
+    def test_strips_linkedin_tracking(self):
+        url = "https://www.linkedin.com/jobs/view/123/?trk=abc&refId=xyz&trackingId=123"
+        assert normalize_url(url) == "https://www.linkedin.com/jobs/view/123"
+
+    def test_strips_djinni_tracking(self):
+        url = "https://djinni.co/jobs/789/?ref=tg_bot&pk_campaign=Telegram&pk_source=tg"
+        assert normalize_url(url) == "https://djinni.co/jobs/789"
+
+    def test_strips_trailing_slash(self):
+        assert normalize_url("https://djinni.co/jobs/123/") == "https://djinni.co/jobs/123"
+
+    def test_no_trailing_slash_unchanged(self):
+        assert normalize_url("https://djinni.co/jobs/123") == "https://djinni.co/jobs/123"
+
+    def test_lowercases_host(self):
+        assert normalize_url("https://Djinni.CO/jobs/1/") == "https://djinni.co/jobs/1"
+
+    def test_empty_string_returns_empty(self):
+        assert normalize_url("") == ""
+
+    def test_same_url_twice_is_idempotent(self):
+        url = "https://jobs.dou.ua/vacancies/123/?utm_source=rss"
+        assert normalize_url(normalize_url(url)) == normalize_url(url)
+
+
+# ── extract_site ──────────────────────────────────────────────────────────────
+
+class TestExtractSite:
+    def test_djinni(self):
+        assert extract_site("https://djinni.co/jobs/123/") == "djinni"
+
+    def test_dou(self):
+        assert extract_site("https://jobs.dou.ua/vacancies/123/") == "dou"
+
+    def test_linkedin(self):
+        assert extract_site("https://www.linkedin.com/jobs/view/456/") == "linkedin"
+
+    def test_hh_ua(self):
+        assert extract_site("https://hh.ua/vacancy/123") == "hh"
+
+    def test_other(self):
+        assert extract_site("https://example.com/jobs/1") == "other"
+
+    def test_empty(self):
+        assert extract_site("") == "other"
+
+
+# ── URL deduplication via insert_vacancy + get_vacancy_by_url ─────────────────
+
+@pytest.mark.asyncio
+async def test_insert_normalises_utm_url():
+    """URL with UTM params → stored as clean URL."""
+    vid = await database.insert_vacancy(
+        url="https://jobs.dou.ua/vacancies/123/?utm_source=jobsrss"
+    )
+    row = await database.get_vacancy_by_id(vid)
+    assert row["url"] == "https://jobs.dou.ua/vacancies/123"
+
+
+@pytest.mark.asyncio
+async def test_get_by_url_finds_with_utm():
+    """get_vacancy_by_url with UTM URL finds normalised entry."""
+    await database.insert_vacancy(url="https://jobs.dou.ua/vacancies/456/")
+    row = await database.get_vacancy_by_url(
+        "https://jobs.dou.ua/vacancies/456/?utm_source=jobsrss"
+    )
+    assert row is not None
+    assert row["url"] == "https://jobs.dou.ua/vacancies/456"
+
+
+@pytest.mark.asyncio
+async def test_get_by_url_finds_without_utm():
+    """get_vacancy_by_url with clean URL finds entry inserted with UTM URL."""
+    await database.insert_vacancy(
+        url="https://jobs.dou.ua/vacancies/789/?utm_source=jobsrss"
+    )
+    row = await database.get_vacancy_by_url("https://jobs.dou.ua/vacancies/789/")
+    assert row is not None
+
+
+@pytest.mark.asyncio
+async def test_insert_dedup_raises_on_duplicate():
+    """Second insert of same URL (with different tracking params) raises IntegrityError."""
+    import sqlite3 as _sqlite3
+    await database.insert_vacancy(url="https://djinni.co/jobs/999/")
+    with pytest.raises(Exception):  # IntegrityError — url UNIQUE violated
+        await database.insert_vacancy(
+            url="https://djinni.co/jobs/999/?ref=tg_bot&pk_campaign=Telegram"
+        )
+
+
+@pytest.mark.asyncio
+async def test_insert_auto_infers_site_from_url():
+    """site is auto-inferred when not passed explicitly."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/111/")
+    row = await database.get_vacancy_by_id(vid)
+    assert row["site"] == "djinni"
+
+    vid2 = await database.insert_vacancy(url="https://jobs.dou.ua/vacancies/222/")
+    row2 = await database.get_vacancy_by_id(vid2)
+    assert row2["site"] == "dou"
+
+
+@pytest.mark.asyncio
+async def test_insert_explicit_site_overrides_inferred():
+    """Explicit site= overrides auto-inference."""
+    vid = await database.insert_vacancy(
+        url="https://djinni.co/jobs/333/",
+        site="other",
+    )
+    row = await database.get_vacancy_by_id(vid)
+    assert row["site"] == "other"

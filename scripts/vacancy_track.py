@@ -186,6 +186,28 @@ def cmd_move_to_inbox(folder_name: str, user_id: int) -> None:
     shutil.move(str(src), str(dst))
 
 
+# ── get ───────────────────────────────────────────────────────────────────────
+
+async def cmd_get(vacancy_id: int) -> None:
+    """Print vacancy record as JSON. Exits 1 with message on stderr if not found."""
+    database.configure(_db_path())
+    await database.init_db()
+
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        print(f"ERROR: vacancy id={vacancy_id} not found", file=sys.stderr)
+        sys.exit(1)
+
+    data = dict(row)
+    if data.get("analysis_json"):
+        try:
+            data["analysis_json"] = json.loads(data["analysis_json"])
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    print(json.dumps(data, ensure_ascii=False, indent=2))
+
+
 # ── delete-inbox ──────────────────────────────────────────────────────────────
 
 def cmd_delete_inbox(folder_name: str) -> None:
@@ -259,6 +281,11 @@ def main() -> None:
     p_ujson.add_argument("--data", required=True,
                          help="JSON string for this phase, or '-' to read from stdin")
 
+    # get
+    p_get = sub.add_parser("get", help="Print vacancy record as JSON by DB id")
+    p_get.add_argument("--id", dest="vacancy_id", type=int, required=True,
+                       help="Vacancy DB id")
+
     # delete-inbox
     p_del = sub.add_parser("delete-inbox", help="Delete raw inbox_manual folder after pipeline processing")
     p_del.add_argument("--folder", required=True,
@@ -288,6 +315,8 @@ def main() -> None:
                 phase=args.phase,
                 data_str=args.data,
             ))
+        elif args.cmd == "get":
+            asyncio.run(cmd_get(vacancy_id=args.vacancy_id))
         elif args.cmd == "move-to-inbox":
             cmd_move_to_inbox(folder_name=args.folder, user_id=args.user_id)
         elif args.cmd == "delete-inbox":

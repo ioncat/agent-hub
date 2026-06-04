@@ -45,6 +45,10 @@ CREATE TABLE IF NOT EXISTS vacancies (
                                           --  "p2":{fit_score,recommendation,category,key_barriers[],hidden_risks[],warnings[],salary,fit_dimensions{}},
                                           --  "p3":{name_variant,cv_language,changes_count},
                                           --  "p4":{cover_language}}
+    applied       INTEGER NOT NULL DEFAULT 0,
+                                          -- 1 = CV was submitted to this vacancy, 0 = not yet
+    starred       INTEGER NOT NULL DEFAULT 0,
+                                          -- 1 = marked as favourite, 0 = normal
     created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 );

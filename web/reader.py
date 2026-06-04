@@ -50,9 +50,11 @@ class VacancyView:
     has_cv: bool
     has_cover: bool
     has_pdf: bool
-    cv_pdf_url: str         # "/files/vacancies/..." — empty string if no PDF
-    analysis_md: str        # full JD_analysis.md content for marked.js rendering
-    salary: str              # "$4500" or "" if unknown
+    cv_pdf_url: str = ""    # "/files/vacancies/..." — empty string if no PDF
+    analysis_md: str = ""   # full JD_analysis.md content for marked.js rendering
+    salary: str = ""         # "$4500" or "" if unknown
+    applied: bool = False   # True if CV was submitted to this vacancy
+    starred: bool = False   # True if marked as favourite
 
     # ── Derived properties ────────────────────────────────────────────────────
 
@@ -128,6 +130,8 @@ def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> Vacanc
     db_warnings: str = row["warnings"] if "warnings" in row.keys() else ""  # type: ignore[index]
     db_salary: str = row["salary"] if "salary" in row.keys() and row["salary"] else ""  # type: ignore[index]
     db_analysis_json: str | None = row["analysis_json"] if "analysis_json" in row.keys() else None  # type: ignore[index]
+    db_applied: bool = bool(row["applied"]) if "applied" in row.keys() else False  # type: ignore[index]
+    db_starred: bool = bool(row["starred"]) if "starred" in row.keys() else False  # type: ignore[index]
 
     date = created_at[:10]  # "YYYY-MM-DD"
 
@@ -208,6 +212,8 @@ def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> Vacanc
         cv_pdf_url=cv_pdf_url,
         analysis_md=analysis_md,
         salary=db_salary,
+        applied=db_applied,
+        starred=db_starred,
     )
 
 

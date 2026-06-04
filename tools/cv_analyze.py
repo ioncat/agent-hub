@@ -92,6 +92,13 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
 
     await database.update_pipeline_run(run1_id, status="done")
 
+    # ── Update DB title from Phase 1 header ──────────────────────────────────
+    extracted_title = _extract_vacancy_title(phase1_output)
+    if extracted_title:
+        await database.update_vacancy_fields(vacancy_id, title=extracted_title)
+        title = extracted_title  # use updated title in downstream output
+        log.info("cv_analyze: title updated → %r", title)
+
     # ── Phase 2: Candidate Fit Assessment ─────────────────────────────────────
     run2_id = await database.insert_pipeline_run(vacancy_id, phase="phase2")
     await database.update_pipeline_run(run2_id, status="running")
@@ -177,6 +184,27 @@ def _strip_quick_scan_from_phase2(phase2: str) -> str:
     if next_sec:
         return (phase2[:m.start()] + rest[next_sec.start():]).strip()
     return phase2[:m.start()].strip()
+
+
+_ROLE_RE    = re.compile(r"\*\*Role:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
+_COMPANY_RE = re.compile(r"\*\*Company:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
+
+
+def _extract_vacancy_title(phase1_output: str) -> str | None:
+    """Parse Role + Company from Phase 1 ## 1.0 Vacancy Header block.
+
+    Returns "Role — Company" string if both fields found, else None.
+    Falls back gracefully — never raises.
+    """
+    role_m    = _ROLE_RE.search(phase1_output)
+    company_m = _COMPANY_RE.search(phase1_output)
+    if not role_m or not company_m:
+        return None
+    role    = role_m.group(1).strip()
+    company = company_m.group(1).strip()
+    if not role or not company:
+        return None
+    return f"{role} — {company}"
 
 
 def _build_analysis_file(

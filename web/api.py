@@ -237,3 +237,31 @@ async def api_vacancy(vacancy_id: int):
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
     return dict(row)
+
+
+class AppliedUpdate(BaseModel):
+    applied: bool
+
+
+@app.patch("/api/vacancies/{vacancy_id}/applied")
+async def api_set_applied(vacancy_id: int, req: AppliedUpdate):
+    """Toggle applied flag for a vacancy. applied=true → CV submitted."""
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+    await database.set_vacancy_applied(vacancy_id, req.applied)
+    return {"vacancy_id": vacancy_id, "applied": req.applied}
+
+
+class StarredUpdate(BaseModel):
+    starred: bool
+
+
+@app.patch("/api/vacancies/{vacancy_id}/starred")
+async def api_set_starred(vacancy_id: int, req: StarredUpdate):
+    """Toggle starred/favourite flag for a vacancy."""
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+    await database.set_vacancy_starred(vacancy_id, req.starred)
+    return {"vacancy_id": vacancy_id, "starred": req.starred}

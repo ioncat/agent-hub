@@ -33,6 +33,19 @@ Do NOT soften gaps. Realistic critique produces better Phase 2 output.
 
 ---
 
+### 1.0 Vacancy Header
+
+**Output this first — machine-readable, exact format:**
+
+```
+**Role:** [exact role title as written in JD]
+**Company:** [company name as written in JD]
+```
+
+Do not skip. Do not add extra text. One line per field.
+
+---
+
 ### 1.1 Company Pain Points
 
 Reconstruct what is actually broken, overloaded, or missing:

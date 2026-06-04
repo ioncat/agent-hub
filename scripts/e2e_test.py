@@ -1,26 +1,56 @@
 #!/usr/bin/env python3
 """
-scripts/e2e_test.py — Manual end-to-end pipeline test.
+scripts/e2e_test.py — Manual end-to-end integration test.
 
-Three input modes:
-  --url URL         fetch JD from web, then run pipeline phases
+PURPOSE
+-------
+Verify that all pipeline phases work correctly together with real services.
+Unlike unit tests (which mock everything), this hits the actual Claude API,
+real jd-parser, and real pdf-service. Run it when you need confidence that
+the full stack is alive — not as a routine check (costs API tokens).
+
+WHEN TO RUN
+-----------
+- After changes to: cv_generate, cv_cover, cv_analyze, ClaudeProvider, CVAdapter
+- After merging a significant EPIC
+- When something seems broken and you need to confirm it's fixed
+- Before a "release" (sharing with new users)
+- NOT on a schedule — use health_check.py (see scripts/health_check.py) for that
+
+AGENT_MODE=testing (default)
+-----------------------------
+Before each Claude API call the script pauses and asks "Proceed? [y/N]".
+This is a cost-control safety net. Options:
+  - Run in interactive terminal: answer y/n manually
+  - Pass --auto-confirm: skip all prompts (use when you've already decided to run)
+
+WHAT IT DOES NOT DO
+-------------------
+- Does NOT send Telegram messages (output goes to stdout only)
+- Does NOT affect production data (uses same DB as dev, but no Telegram delivery)
+
+INPUT MODES
+-----------
+  --url URL         fetch JD from web → run pipeline phases
   --file PATH.md    read JD from local .md file (skips fetch)
   --id VACANCY_ID   reprocess existing DB vacancy (skips fetch)
 
-Does NOT send Telegram messages — prints output to stdout.
+PREREQUISITES
+-------------
+  - .env: ANTHROPIC_API_KEY set, AGENT_MODE=testing
+  - jd-parser running on PARSER_URL (:8001) — required for --url mode
+  - pdf-service running on :8002 — required for generate phase
+  - DB at DB_PATH (default db/agent.db)
 
-Requires:
-    - .env with ANTHROPIC_API_KEY (and AGENT_MODE=testing for confirmation)
-    - jd-parser on PARSER_URL for --url mode (default http://localhost:8001)
-    - DB at DB_PATH (default db/agent.db)
-
-Usage:
+USAGE
+-----
     python scripts/e2e_test.py
     python scripts/e2e_test.py --url https://jobs.dou.ua/companies/.../
-    python scripts/e2e_test.py --file vacancies/djinni/2026-06/123/JD.md
+    python scripts/e2e_test.py --file vacancies/1/dou/2026-06/123/JD.md
     python scripts/e2e_test.py --id 42
     python scripts/e2e_test.py --url https://... --phase fetch,analyze
     python scripts/e2e_test.py --id 42 --phase generate,cover
+    python scripts/e2e_test.py --id 42 --phase generate,cover --auto-confirm
 """
 
 import argparse

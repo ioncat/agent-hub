@@ -110,6 +110,10 @@ async def init_db() -> None:
             "ALTER TABLE users ADD COLUMN onboarding_step TEXT",
             # Structured pipeline data per phase (component-based CV assembly foundation)
             "ALTER TABLE vacancies ADD COLUMN analysis_json TEXT",
+            # Applied flag: 1 = CV submitted to this vacancy
+            "ALTER TABLE vacancies ADD COLUMN applied INTEGER NOT NULL DEFAULT 0",
+            # Starred/favourite flag
+            "ALTER TABLE vacancies ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
         ]:
             try:
                 await db.execute(migration)
@@ -409,6 +413,26 @@ async def update_vacancy_status(vacancy_id: int, status: str) -> None:
             WHERE id = ?
             """,
             (status, vacancy_id),
+        )
+        await db.commit()
+
+
+async def set_vacancy_applied(vacancy_id: int, applied: bool) -> None:
+    """Set applied flag for a vacancy. 1 = CV submitted, 0 = not submitted."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET applied = ?, updated_at = datetime('now') WHERE id = ?",
+            (1 if applied else 0, vacancy_id),
+        )
+        await db.commit()
+
+
+async def set_vacancy_starred(vacancy_id: int, starred: bool) -> None:
+    """Set starred/favourite flag for a vacancy. 1 = favourite, 0 = normal."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET starred = ?, updated_at = datetime('now') WHERE id = ?",
+            (1 if starred else 0, vacancy_id),
         )
         await db.commit()
 

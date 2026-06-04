@@ -12,7 +12,12 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 import pytest
 
 from core.llm_client import LLMError
-from tools.cv_analyze import _build_analysis_file, _extract_quick_scan, cv_analyze
+from tools.cv_analyze import (
+    _build_analysis_file,
+    _extract_quick_scan,
+    _extract_vacancy_title,
+    cv_analyze,
+)
 
 
 # ── Fixtures / helpers ────────────────────────────────────────────────────────
@@ -77,6 +82,8 @@ def _mock_db(
     mock_db.insert_pipeline_run = AsyncMock(side_effect=run_ids)
     mock_db.update_pipeline_run = AsyncMock()
     mock_db.update_vacancy_status = AsyncMock()
+    mock_db.update_vacancy_fields = AsyncMock()
+    mock_db.insert_llm_usage = AsyncMock()
     return mock_db
 
 
@@ -137,6 +144,72 @@ def test_build_analysis_file_structure():
     qs_pos = content.index("## Quick Scan")
     p1_pos = content.index("Phase 1 content here")
     assert qs_pos < p1_pos
+
+
+# ── _extract_vacancy_title ───────────────────────────────────────────────────
+
+def test_extract_vacancy_title_happy_path():
+    text = "**Role:** Senior PM\n**Company:** Acme Corp\n\nMore text."
+    assert _extract_vacancy_title(text) == "Senior PM — Acme Corp"
+
+
+def test_extract_vacancy_title_case_insensitive():
+    text = "**role:** Product Lead\n**company:** Involve.software"
+    assert _extract_vacancy_title(text) == "Product Lead — Involve.software"
+
+
+def test_extract_vacancy_title_missing_company_returns_none():
+    text = "**Role:** Senior PM\n\nNo company line here."
+    assert _extract_vacancy_title(text) is None
+
+
+def test_extract_vacancy_title_missing_role_returns_none():
+    text = "**Company:** Acme Corp\n\nNo role line here."
+    assert _extract_vacancy_title(text) is None
+
+
+def test_extract_vacancy_title_empty_fields_returns_none():
+    text = "**Role:**   \n**Company:**   \n"
+    assert _extract_vacancy_title(text) is None
+
+
+def test_extract_vacancy_title_no_header_returns_none():
+    text = "Plain phase 1 output without structured header."
+    assert _extract_vacancy_title(text) is None
+
+
+# ── cv_analyze — title update ──────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_analyze_updates_db_title_when_phase1_has_header(tmp_path):
+    """When Phase 1 output contains **Role:** + **Company:**, DB title is updated."""
+    jd_path = _write_jd(tmp_path)
+    vacancy_row = _make_vacancy_row(jd_path)
+    phase1_with_header = "**Role:** Product Lead\n**Company:** Involve.software\n\nRest of analysis."
+    llm = _make_llm(side_effect=[phase1_with_header, "Phase 2 output"])
+    ctx = _make_ctx(tmp_path, llm)
+    mock_db = _mock_db(vacancy_row=vacancy_row)
+
+    with patch("tools.cv_analyze.database", mock_db):
+        result = await cv_analyze(ctx, 1)
+
+    mock_db.update_vacancy_fields.assert_awaited_once_with(1, title="Product Lead — Involve.software")
+    assert "Product Lead — Involve.software" in result
+
+
+@pytest.mark.asyncio
+async def test_analyze_skips_title_update_when_no_header(tmp_path):
+    """When Phase 1 output has no structured header, title is not updated."""
+    jd_path = _write_jd(tmp_path)
+    vacancy_row = _make_vacancy_row(jd_path)
+    llm = _make_llm(side_effect=["Plain Phase 1 output without header.", "Phase 2 output"])
+    ctx = _make_ctx(tmp_path, llm)
+    mock_db = _mock_db(vacancy_row=vacancy_row)
+
+    with patch("tools.cv_analyze.database", mock_db):
+        await cv_analyze(ctx, 1)
+
+    mock_db.update_vacancy_fields.assert_not_awaited()
 
 
 # ── cv_analyze — happy path ───────────────────────────────────────────────────
