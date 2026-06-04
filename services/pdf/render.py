@@ -329,31 +329,50 @@ def render_md(pdf: CVDocument, text: str) -> None:
     lines = text.split("\n")
     i = 0
 
-    while i < len(lines) and not lines[i].strip():
-        i += 1
-    if i < len(lines):
-        name = re.sub(r"[*#]", "", lines[i]).strip()
-        pdf.name_block(name)
-        i += 1
+    # Detect CV-style header: a contacts line (markdown links) within the first few
+    # non-empty lines. Cover letters / prose have none → skip header parsing so the
+    # text renders as normal wrapped paragraphs. Otherwise the first lines get forced
+    # into name_block/headline_block/contacts_block, which do NOT wrap and overflow.
+    link_re = re.compile(r"\[[^\]]+\]\([^)]+\)")
+    is_cv_header = False
+    seen = 0
+    for probe in lines:
+        ps = probe.strip()
+        if not ps:
+            continue
+        seen += 1
+        if link_re.search(ps) and not ps.startswith("#") and not ps.startswith("---"):
+            is_cv_header = True
+            break
+        if seen >= 4:
+            break
 
-    while i < len(lines) and not lines[i].strip():
-        i += 1
-    if i < len(lines):
-        s = lines[i].strip()
-        if not s.startswith("---") and not s.startswith("#") and not re.match(r"^\*\*[A-ZА-ЯІЇЄ]{2,}", s):
-            is_contacts = bool(re.search(r"\[[^\]]+\]\([^)]+\)", s))
-            if is_contacts:
-                pdf.contacts_block(s)
-            else:
-                pdf.headline_block(s)
-                i += 1
-                while i < len(lines) and not lines[i].strip():
-                    i += 1
-                if i < len(lines):
-                    s2 = lines[i].strip()
-                    if not s2.startswith("---") and not s2.startswith("#"):
-                        pdf.contacts_block(s2)
+    if is_cv_header:
+        while i < len(lines) and not lines[i].strip():
             i += 1
+        if i < len(lines):
+            name = re.sub(r"[*#]", "", lines[i]).strip()
+            pdf.name_block(name)
+            i += 1
+
+        while i < len(lines) and not lines[i].strip():
+            i += 1
+        if i < len(lines):
+            s = lines[i].strip()
+            if not s.startswith("---") and not s.startswith("#") and not re.match(r"^\*\*[A-ZА-ЯІЇЄ]{2,}", s):
+                is_contacts = bool(link_re.search(s))
+                if is_contacts:
+                    pdf.contacts_block(s)
+                else:
+                    pdf.headline_block(s)
+                    i += 1
+                    while i < len(lines) and not lines[i].strip():
+                        i += 1
+                    if i < len(lines):
+                        s2 = lines[i].strip()
+                        if not s2.startswith("---") and not s2.startswith("#"):
+                            pdf.contacts_block(s2)
+                i += 1
 
     first_divider = True
 
