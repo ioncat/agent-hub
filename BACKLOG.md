@@ -24,6 +24,19 @@
 
 ---
 
+## 🟡 P1 — Phase 2.5 Objection Handling (added 2026-06-05)
+
+New pipeline step formalized in `skill/SKILL.md` → "Phase 2.5 — Objection Handling": when Key Barriers ≠ нет, resolve weaknesses interactively BEFORE CV draft; resolved evidence appended to PROFILE.md + JD_analysis.md.
+**Follow-up:** dedicated `prompts/[skill_type]/phase2_5_objections.md` prompt file (currently spec lives in SKILL.md). Optional DB `analysis_json.p2_5`.
+
+---
+
+## 🟢 P2 — Evidence Bank per user (added 2026-06-05)
+
+Two-layer profile: `PROFILE.md` (canonical, lean) + `skill/users/[id]/evidence/*.md` (deep narrative cases). Pipeline consults evidence bank in Phase 2.5 (objection arguments), Phase 3 (CV case detail), interview prep. Integrate existing narrative docs (e.g. `HostiServer — нарратив опыта.md`, currently outside repo). See `docs/discovery/hypotheses/H-003`. **Deferred** — mechanism design later; for now evidence mined manually.
+
+---
+
 ## P0 — Market Research (do before next dev sprint)
 
 ### 🔴 Competitive landscape analysis

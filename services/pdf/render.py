@@ -167,7 +167,7 @@ class CVDocument(FPDF):
         self.ln(1)
         self.set_font(FONT_NAME, "B", 12)
         self.set_text_color(0, 0, 0)
-        self.cell(0, 6.5, text, new_x="LMARGIN", new_y="NEXT")
+        self.multi_cell(0, 6.5, text, new_x="LMARGIN", new_y="NEXT")
 
     def company_line(self, text: str) -> None:
         self.set_font(FONT_NAME, "", 11)
