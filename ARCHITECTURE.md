@@ -196,3 +196,48 @@ vacancies/
 - `docs/delivery/PIVOT-PLAN.md` — план фаз разработки
 - `BACKLOG.md` — статус эпиков
 - `docs/discovery/core-differentiators.md` — конкурентные преимущества, требующие отдельного дизайна
+
+---
+
+## Design Decisions Log
+
+### ADR-01 — 2026-05-31: Pivot from generic agent orchestrator to focused vertical service
+
+**Status:** Accepted  
+**Context:**
+
+The original architecture treated this project as a generic multi-agent orchestration platform — an AI framework that could be adapted to any workflow. The product was positioned as a tool showcase: PydanticAI, prompt caching, extended thinking, multi-agent dispatch.
+
+After building and running the CV pipeline end-to-end for real vacancies, the product identity became unambiguous: the system was doing exactly one thing well — acting as a job counselor for PdM/PO/PM candidates. The "generic platform" framing was misleading to users and wasteful for development — every decision was being made in service of a specific, narrow problem.
+
+**Decision:**
+
+Reposition as a focused vertical service. The tight, opinionated pipeline is a feature, not a limitation. Everything outside this pipeline — generic agents, multi-domain routing, platform abstractions — was removed or never built.
+
+Three structural consequences:
+
+1. **Monorepo consolidation.** Three external repos (`knowledge-mirror-parser`, `callback-cv`, `job-board-monitor`) were being used as dependencies without ownership. Each was audited, stripped of dead code, and migrated into `services/` as first-class components. Nothing user-built lives outside this repo.
+
+2. **Profile moves into the product.** The candidate profile lived in a hand-edited `PROFILE.md` file in an external repo. That's not a product — it's a config file. Profile generation via onboarding interview (PDF → structured profile → DB) became a core feature, not an afterthought.
+
+3. **Multi-user by design from day one.** Single hardcoded `TELEGRAM_CHAT_ID` was the entire user model. Retrofitting multi-user later is expensive. `user_id` was introduced everywhere (DB schema, filesystem paths, LLM context) before any second user existed.
+
+**Alternatives considered:**
+
+| Alternative | Why rejected |
+|-------------|-------------|
+| Keep generic platform framing | Product identity was unclear; every feature decision became ambiguous |
+| Incremental migration (keep external repos) | No ownership = no ability to audit, strip, or change the interface contract |
+| Single-user forever | Multi-user is architectural, not just a feature; retrofitting is a rewrite |
+
+**Trade-offs accepted:**
+
+- Tight ICP (PdM/PO/PM) — intentionally narrows the addressable market to increase relevance per user
+- Opinionated pipeline — phases are fixed; non-PM use cases require a new `skill_type`, not a new agent
+- Monorepo — tighter coupling between services, but full ownership and no external dependency drift
+
+**Outcome:**
+
+All five pipeline phases remain intact and tested. External repo dependencies eliminated. Services architecture established (`services/parser/`, `services/pdf/`, `services/job-monitor/`). Multi-user schema in place. Profile onboarding epic defined.
+
+See `docs/delivery/PIVOT-PLAN.md` for the full migration phase plan.
